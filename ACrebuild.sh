@@ -248,12 +248,24 @@ main_menu() {
     fi
 
     if [ "$RUN_SERVER" = true ]; then
+        # Run authserver and worldserver in tmux session
         run_tmux_session
         print_message $GREEN "Server executed in tmux session." true
     elif [ "$BUILD_ONLY" = false ]; then
         print_message $GREEN "Only server run was selected. No build or update occurred." true
     fi
+
+    # Run authserver for 60 seconds (Only for option 2)
+    if [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
+        run_authserver
+    fi
 }
 
-# Start the main menu function
+# Function to handle errors
+handle_error() {
+    print_message $RED "$1" true
+    exit 1
+}
+
+# Run the main menu function when the script starts
 main_menu
