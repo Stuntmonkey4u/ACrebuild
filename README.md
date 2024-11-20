@@ -1,4 +1,4 @@
-# AzerothCore Update Script
+# AzerothCore Rebuild/Update Script
 
 This script is designed to help you **update**, **build**, and **run** **AzerothCore** — a popular server emulator for **World of Warcraft**. It simplifies the process of updating an existing AzerothCore server, checking for missing dependencies, rebuilding the server, and running it in a tmux session.
 
