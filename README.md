@@ -18,7 +18,7 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
 1. **Clone the repository** to your local machine:
 
    ```bash
-   git clone https://github.com/Stuntmonkey4u/AzerothCore-Update-Script.git
+   git clone https://github.com/Stuntmonkey4u/ACrebuild.git
    cd AzerothCore-Update-Script
    chmod +x ACrebuild.sh
 
@@ -63,4 +63,4 @@ Created by Stuntmonkey4u
 
 ## Repository
 
-https://github.com/Stuntmonkey4u/AzerothCore-Update-Script/archive/refs/heads/master.zip
+https://github.com/Stuntmonkey4u/ACrebuild/archive/refs/heads/master.zip
