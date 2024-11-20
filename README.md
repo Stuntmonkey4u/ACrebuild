@@ -23,4 +23,32 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
    chmod +x ACrebuild.sh
 
 2. **Run the script**
+
+   ```bash
    ./ACrebuild.sh
+
+---
+
+## How It Works
+
+When you run the script, it presents you with a simple menu of options to choose from:
+
+1. **Update, Rebuild, and Run the Server:** Updates the AzerothCore source code (optional), rebuilds the server, and runs both the authserver and worldserver in a tmux session.
+
+2. **Only Rebuild the Server:** Rebuilds AzerothCore without updating the source code.
+
+3. **Run the Server without Rebuilding:** Runs the server without rebuilding it (useful if you don't need to update the server).
+
+4. **Exit: Exits the script without making any changes.**
+
+---
+
+## License
+
+This script is licensed under the **MIT License**. Feel free to modify and use it as needed.
+
+---
+
+## Disclaimer
+
+This script is provided as-is, with no warranties or guarantees. Use at your own risk. Make sure to backup your server data before running any script that modifies or updates your environment.
