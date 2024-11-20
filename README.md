@@ -52,3 +52,15 @@ This script is licensed under the **MIT License**. Feel free to modify and use i
 ## Disclaimer
 
 This script is provided as-is, with no warranties or guarantees. Use at your own risk. Make sure to backup your server data before running any script that modifies or updates your environment.
+
+---
+
+## Credits
+
+Created by Stuntmonkey4u
+
+---
+
+## Repository
+
+https://github.com/Stuntmonkey4u/AzerothCore-Update-Script/archive/refs/heads/master.zip
