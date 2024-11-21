@@ -33,9 +33,9 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
 
 When you run the script, it presents you with a simple menu of options to choose from:
 
-1. **Update, Rebuild, and Run the Server:** Updates the AzerothCore source code (optional), rebuilds the server, and runs both the authserver and worldserver in a tmux session.
+1. **Rebuild and Run the Server:** Updates the AzerothCore source code (optional), rebuilds the server, and runs both the authserver and worldserver in a tmux session.
 
-2. **Only Rebuild the Server:** Rebuilds AzerothCore without updating the source code.
+2. **Only Rebuild the Server:** Rebuilds AzerothCore without running the server after completion.
 
 3. **Run the Server without Rebuilding:** Runs the server without rebuilding it (useful if you don't need to update the server).
 
