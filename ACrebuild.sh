@@ -102,11 +102,16 @@ update_source_code() {
 # Function to display a welcome message
 welcome_message() {
     clear
-    print_message $BLUE "=====================================" true
-    print_message $BLUE "      Welcome to AzerothCore Setup   " true
-    print_message $BLUE "=====================================" true
-    print_message $BLUE "This script will help you update, build, and run AzerothCore on your system." true
-    print_message $BLUE "=====================================" true
+    print_message $BLUE "----------------------------------------------" true
+    print_message $BLUE "Welcome to AzerothCore Rebuild!           " true
+    print_message $BLUE "----------------------------------------------" true
+    echo ""
+    print_message $BLUE "This script will help you:" true
+    print_message $BLUE "  - Update AzerothCore source code" true
+    print_message $BLUE "  - Build the latest version" true
+    print_message $BLUE "  - Run AzerothCore on your system" true
+    echo ""
+    print_message $BLUE "----------------------------------------------" true
     echo ""
 }
 
@@ -270,10 +275,18 @@ run_tmux_session() {
 
     # Print the updated, epic message after clearing the screen
     clear  # Clear the screen before displaying the message
-    print_message $GREEN "\nAzeroth has been reborn!\n" true
-    print_message $GREEN "The forces of light and darkness await their champions!\n" true
-    print_message $GREEN "Prepare for the epic battle that lies ahead!\n" true
-    print_message $YELLOW "To switch to the tmux session, run: 'tmux attach -t azeroth'\n" true
+    print_message $CYAN "----------------------------------------------------" 
+    print_message $WHITE "\n             Azeroth has been reborn!\n"
+    echo ""
+    print_message $WHITE "         The forces of light and darkness"
+    print_message $WHITE "              await their champions!\n"
+    echo ""
+    print_message $RED "    Prepare for the epic battle that lies ahead!\n"   
+    print_message $CYAN "----------------------------------------------------" 
+    echo ""
+    print_message $YELLOW "To switch to the AzerothCore session, run:" 
+    print_message $YELLOW "'tmux attach -t azeroth'" 
+    echo ""  # Add some space before closing
 }
 
 # Main function to start the script
