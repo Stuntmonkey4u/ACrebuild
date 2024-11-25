@@ -110,6 +110,7 @@ welcome_message() {
     print_message $BLUE "  - Update AzerothCore source code" true
     print_message $BLUE "  - Build the latest version" true
     print_message $BLUE "  - Run AzerothCore on your system" true
+    print_message $BLUE "  - Update modules" true
     echo ""
     print_message $BLUE "----------------------------------------------" true
     echo ""
