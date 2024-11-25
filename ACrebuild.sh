@@ -122,39 +122,38 @@ show_menu() {
     print_message $YELLOW "1) Build and run the server" false
     print_message $YELLOW "2) Only build the server" false
     print_message $YELLOW "3) Run the server without building" false
-    print_message $YELLOW "4) Exit" false
+    print_message $YELLOW "4) Update modules" false
+    print_message $YELLOW "5) Exit" false
     echo ""
 }
 
 # Function to handle user input for the menu
 handle_menu_choice() {
-    while true; do
-        read -p "Enter choice [1-4]: " choice
-        case $choice in
-            1)
-                RUN_SERVER=true
-                BUILD_ONLY=true
-                break
-                ;;
-            2)
-                RUN_SERVER=false
-                BUILD_ONLY=true
-                break
-                ;;
-            3)
-                RUN_SERVER=true
-                BUILD_ONLY=false
-                break
-                ;;
-            4)
-                print_message $GREEN "Exiting the script..." true
-                exit 0
-                ;;
-            *)
-                print_message $RED "Invalid input. Please enter a valid option (1-4)." false
-                ;;
-        esac
-    done
+    read -p "Enter choice [1-5]: " choice
+    case $choice in
+        1)
+            RUN_SERVER=true
+            BUILD_ONLY=true
+            ;;
+        2)
+            RUN_SERVER=false
+            BUILD_ONLY=true
+            ;;
+        3)
+            RUN_SERVER=true
+            BUILD_ONLY=false
+            ;;
+        4)
+            ./ACmod.sh || { print_message $RED "Failed to execute ACmod.sh. Ensure it exists and is executable." true; }
+            ;;
+        5)
+            print_message $GREEN "Exiting the script..." true
+            exit 0
+            ;;
+        *)
+            print_message $RED "Invalid input. Please enter a valid option (1-5)." false
+            ;;
+    esac
 }
 
 # Function to ask for confirmation before updating or building
@@ -302,27 +301,33 @@ main_menu() {
     # After dependency checks in the main function
     ask_for_core_installation_path
 
-    # Show the menu and handle user choice
-    show_menu
-    handle_menu_choice
+    # Show the menu in a loop
+    while true; do
+        show_menu
+        handle_menu_choice
 
-    # Proceed with selected action
-    if [ "$BUILD_ONLY" = true ]; then
-        ask_for_update_confirmation
-        build_and_install_with_spinner
-    fi
+        # Proceed with selected action
+        if [ "$BUILD_ONLY" = true ]; then
+            ask_for_update_confirmation
+            build_and_install_with_spinner
+        fi
 
-    if [ "$RUN_SERVER" = true ]; then
-        # Run authserver and worldserver in tmux session
-        run_tmux_session
-    elif [ "$BUILD_ONLY" = false ]; then
-        print_message $GREEN "Only server run was selected. No build or update occurred." true
-    fi
+        if [ "$RUN_SERVER" = true ]; then
+            # Run authserver and worldserver in tmux session
+            run_tmux_session
+        elif [ "$BUILD_ONLY" = false ]; then
+            print_message $GREEN "Only server run was selected. No build or update occurred." true
+        fi
 
-    # Run authserver for 60 seconds (Only for option 2)
-    if [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
-        run_authserver
-    fi
+        # Run authserver for 60 seconds (Only for option 2)
+        if [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
+            run_authserver
+        fi
+
+        # Reset action flags after execution
+        RUN_SERVER=false
+        BUILD_ONLY=false
+    done
 }
 
 # Function to handle errors
