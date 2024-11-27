@@ -153,6 +153,7 @@ handle_menu_choice() {
             BUILD_ONLY=false
             ;;
         4)
+            export AZEROTHCORE_DIR
             ./ACmod.sh || { print_message $RED "Failed to execute ACmod.sh. Ensure it exists and is executable." true; }
             ;;
         5)
@@ -300,6 +301,7 @@ run_tmux_session() {
     print_message $YELLOW "To switch to the AzerothCore session, run:" 
     print_message $YELLOW "'tmux attach -t azeroth'" 
     echo ""  # Add some space before closing
+    exit
 }
 
 # Main function to start the script

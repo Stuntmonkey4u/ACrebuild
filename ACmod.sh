@@ -139,6 +139,5 @@ update_modules() {
 }
 
 # Main execution block
-MODULE_DIR="$HOME/azerothcore/modules"  # Change this to your modules directory if needed
-
+MODULE_DIR="${AZEROTHCORE_DIR}/modules"  # Use environment variable
 update_modules "$MODULE_DIR"
