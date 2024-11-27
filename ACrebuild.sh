@@ -87,7 +87,15 @@ ask_for_core_installation_path() {
         AZEROTHCORE_DIR="$user_input"
     fi
 
+    # Update the build directory dynamically based on AZEROTHCORE_DIR
+    BUILD_DIR="$AZEROTHCORE_DIR/build"
+    AUTH_SERVER_EXEC="$AZEROTHCORE_DIR/env/dist/bin/authserver"
+    WORLD_SERVER_EXEC="$AZEROTHCORE_DIR/env/dist/bin/worldserver"
+
     print_message $GREEN "AzerothCore directory set to: $AZEROTHCORE_DIR" true
+    print_message $GREEN "Build directory set to: $BUILD_DIR" true
+    print_message $GREEN "Auth server exec set to: $AUTH_SERVER_EXEC" true
+    print_message $GREEN "World server exec set to: $WORLD_SERVER_EXEC" true
 }
 
 # Function to update the AzerothCore source code
@@ -120,10 +128,10 @@ welcome_message() {
 show_menu() {
     print_message $YELLOW "Please choose an option:" true
     echo ""
-    print_message $YELLOW "1) Build and run the server" false
-    print_message $YELLOW "2) Only build the server" false
-    print_message $YELLOW "3) Run the server without building" false
-    print_message $YELLOW "4) Update modules" false
+    print_message $YELLOW "1) Build and Run the Server" false
+    print_message $YELLOW "2) Only Build the Server" false
+    print_message $YELLOW "3) Run the Server Without Building" false
+    print_message $YELLOW "4) Update Modules" false
     print_message $YELLOW "5) Exit" false
     echo ""
 }
@@ -202,10 +210,15 @@ ask_for_cores() {
 build_and_install_with_spinner() {
     print_message $YELLOW "Building and installing AzerothCore..." true
 
+    # Ensure BUILD_DIR is correctly updated
+    if [ ! -d "$BUILD_DIR" ]; then
+        handle_error "Build directory $BUILD_DIR does not exist."
+    fi
+
     # Run cmake with the provided options
     cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR"
 
-    cmake ../ -DCMAKE_INSTALL_PREFIX=$HOME/azerothcore/env/dist/ -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed"
+    cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed"
 
     # Run the build process using the specified number of cores
     make -j "$CORES" install || handle_error "Build failed"
