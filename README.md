@@ -9,7 +9,7 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
 - **Source Code Update**: Allows you to update your existing AzerothCore server's source code from the GitHub repository.
 - **Rebuilding the Server**: Uses `cmake` and `make` to rebuild and reinstall the updated AzerothCore server.
 - **Server Running**: Runs the **authserver** (authentication server) and **worldserver** (game world server) in a **tmux** session for easy monitoring.
-- **Module update**: Choose whether to update all or individual mods.
+- **Module Update**: Choose whether to update all or individual mods.
 - **Flexible Options**: Choose whether to update and rebuild the server, only rebuild it, or run it without rebuilding.
 
 ---
@@ -38,9 +38,11 @@ When you run the script, it presents you with a simple menu of options to choose
 
 2. **Only Rebuild the Server:** Rebuilds AzerothCore without running the server after completion.
 
-3. **Run the Server without Rebuilding:** Runs the server without rebuilding it (useful if you don't need to update the server).
+3. **Run the Server Without Rebuilding:** Runs the server in a tmux session without rebuilding it (useful if you don't need to update the server).
 
-4. **Exit: Exits the script without making any changes.**
+4. **Update Modules:** Updates the modules that were downloaded from Github. If module a does not work, import the module's SQL files to your database.
+
+5. **Exit:** Exits the script without making any changes.
 
 ---
 
