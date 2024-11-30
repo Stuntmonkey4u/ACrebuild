@@ -58,12 +58,7 @@ This script is provided as-is, with no warranties or guarantees. Use at your own
 
 ---
 
-## Credits
+## Credits (So Far...)
 
 Created by Stuntmonkey4u
 
----
-
-## Repository
-
-https://github.com/Stuntmonkey4u/ACrebuild/archive/refs/heads/master.zip
