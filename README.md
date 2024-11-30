@@ -9,7 +9,7 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
 - **Source Code Update**: Allows you to update your existing AzerothCore server's source code from the GitHub repository.
 - **Rebuilding the Server**: Uses `cmake` and `make` to rebuild and reinstall the updated AzerothCore server.
 - **Server Running**: Runs the **authserver** (authentication server) and **worldserver** (game world server) in a **tmux** session for easy monitoring.
-- **Module Update**: Choose whether to update all or individual mods.
+- **Module Update**: Helps you to update all or individual mods.
 - **Flexible Options**: Choose whether to update and rebuild the server, only rebuild it, or run it without rebuilding.
 
 ---
@@ -21,7 +21,7 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
    ```bash
    git clone https://github.com/Stuntmonkey4u/ACrebuild.git
    cd ACrebuild
-   chmod +x ACrebuild.sh
+   chmod +x ACrebuild.sh ACmod.sh
 
 2. **Run the script**
 
