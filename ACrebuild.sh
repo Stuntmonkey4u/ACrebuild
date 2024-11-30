@@ -162,6 +162,7 @@ handle_menu_choice() {
             ;;
         *)
             print_message $RED "Invalid input. Please enter a valid option (1-5)." false
+            return
             ;;
     esac
 }
@@ -257,6 +258,7 @@ run_authserver() {
     kill "$AUTH_SERVER_PID"
     wait "$AUTH_SERVER_PID" 2>/dev/null  # Wait for the authserver process to properly exit
     print_message $GREEN "authserver has been stopped after 60 seconds." true
+    exit
 }
 
 # Function to run worldserver and authserver in tmux session
