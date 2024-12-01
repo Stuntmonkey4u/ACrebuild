@@ -54,8 +54,8 @@ check_dependencies() {
 
 # Function to ask if the user wants to install missing dependencies
 ask_to_install_dependencies() {
-    print_message $YELLOW "The following dependencies are missing: ${MISSING_DEPENDENCIES[*]}" true
-    print_message $YELLOW "Do you want to install them? (y/n)" true
+    print_message $YELLOW "The following dependencies are required but missing: ${MISSING_DEPENDENCIES[*]}" true
+    print_message $YELLOW "Would you like to install them now? (y/n)" true
     read -r answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         install_dependencies
@@ -77,7 +77,7 @@ install_dependencies() {
 
 # Function to ask the user where their AzerothCore is installed
 ask_for_core_installation_path() {
-    print_message $YELLOW "Where is your AzerothCore installed? (default: $HOME/azerothcore)" true
+    print_message $YELLOW "Where is your existing AzerothCore installation located? (default: $HOME/azerothcore)" true
     read -r user_input
 
     # If user input is empty, use default path
@@ -100,7 +100,7 @@ ask_for_core_installation_path() {
 
 # Function to update the AzerothCore source code
 update_source_code() {
-    print_message $YELLOW "Updating AzerothCore source code..." true
+    print_message $YELLOW "Updating your AzerothCore source code..." true
     cd "$AZEROTHCORE_DIR" || handle_error "Failed to change directory to $AZEROTHCORE_DIR"
     
     sudo git pull origin master || handle_error "Git pull failed"
@@ -114,11 +114,11 @@ welcome_message() {
     print_message $BLUE "Welcome to AzerothCore Rebuild!           " true
     print_message $BLUE "----------------------------------------------" true
     echo ""
-    print_message $BLUE "This script will help you:" true
-    print_message $BLUE "  - Update AzerothCore source code" true
-    print_message $BLUE "  - Build the latest version" true
-    print_message $BLUE "  - Run AzerothCore on your system" true
-    print_message $BLUE "  - Update modules" true
+    print_message $BLUE "This script helps you manage your existing AzerothCore server by allowing you to:" true
+    print_message $BLUE "  - Update the AzerothCore source code" true
+    print_message $BLUE "  - Rebuild the server with the latest changes" true
+    print_message $BLUE "  - Run your AzerothCore server" true
+    print_message $BLUE "  - Update server module" true
     echo ""
     print_message $BLUE "----------------------------------------------" true
     echo ""
@@ -126,12 +126,13 @@ welcome_message() {
 
 # Function to display the menu
 show_menu() {
-    print_message $YELLOW "Please choose an option:" true
     echo ""
-    print_message $YELLOW "1) Build and Run the Server" false
-    print_message $YELLOW "2) Only Build the Server" false
-    print_message $YELLOW "3) Run the Server Without Building" false
-    print_message $YELLOW "4) Update Modules" false
+    print_message $YELLOW "Select an option from the menu below:" true
+    echo ""
+    print_message $YELLOW "1) Rebuild and Run the Server" false
+    print_message $YELLOW "2) Rebuild the Server Only" false
+    print_message $YELLOW "3) Run the Server (Without Building)" false
+    print_message $YELLOW "4) Update Server Modules" false
     print_message $YELLOW "5) Exit" false
     echo ""
 }
@@ -157,11 +158,11 @@ handle_menu_choice() {
             ./ACmod.sh || { print_message $RED "Failed to execute ACmod.sh. Ensure it exists and is executable." true; }
             ;;
         5)
-            print_message $GREEN "Exiting the script..." true
+            print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
             exit 0
             ;;
         *)
-            print_message $RED "Invalid input. Please enter a valid option (1-5)." false
+            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
             return
             ;;
     esac
@@ -170,7 +171,7 @@ handle_menu_choice() {
 # Function to ask for confirmation before updating or building
 ask_for_update_confirmation() {
     while true; do
-        print_message $YELLOW "Do you want to update the AzerothCore source code before building? (y/n)" true
+        print_message $YELLOW "Would you like to update the AzerothCore source code before rebuilding? (y/n)" true
         read -r confirmation
         if [[ "$confirmation" =~ ^[Yy]$ ]]; then
             update_source_code
@@ -241,7 +242,7 @@ run_authserver() {
     AUTH_SERVER_PID=$!
 
     # Countdown timer
-    COUNTDOWN=60
+    COUNTDOWN=45
     while [ $COUNTDOWN -gt 0 ]; do
         if [ $COUNTDOWN -eq 1 ]; then
             # Print countdown with singular "second", in green
@@ -257,7 +258,7 @@ run_authserver() {
     # Kill the authserver after 60 seconds
     kill "$AUTH_SERVER_PID"
     wait "$AUTH_SERVER_PID" 2>/dev/null  # Wait for the authserver process to properly exit
-    print_message $GREEN "authserver has been stopped after 60 seconds." true
+    print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
     exit
 }
 
@@ -291,17 +292,15 @@ run_tmux_session() {
 
     # Print the updated, epic message after clearing the screen
     clear  # Clear the screen before displaying the message
+    print_message $CYAN "----------------------------------------------------"
+    print_message $WHITE "\n  AzerothCore has been reawakened!"
+    print_message $WHITE "  The server is ready, but there's a new challenge..."
+    echo ""
+    print_message $YELLOW "  The NPCs have become sentient and they want royalties"
+    print_message $YELLOW "  They've started forming a union. Negotiations begin soon."
+    echo ""
+    print_message $CYAN "  Settle the negotiations: 'tmux attach -t azeroth'"
     print_message $CYAN "----------------------------------------------------" 
-    print_message $WHITE "\n             Azeroth has been reborn!\n"
-    echo ""
-    print_message $WHITE "         The forces of light and darkness"
-    print_message $WHITE "              await their champions!\n"
-    echo ""
-    print_message $RED "    Prepare for the epic battle that lies ahead!\n"   
-    print_message $CYAN "----------------------------------------------------" 
-    echo ""
-    print_message $YELLOW "To switch to the AzerothCore session, run:" 
-    print_message $YELLOW "'tmux attach -t azeroth'" 
     echo ""  # Add some space before closing
     exit
 }
