@@ -98,12 +98,29 @@ ask_for_core_installation_path() {
     print_message $GREEN "World server exec set to: $WORLD_SERVER_EXEC" true
 }
 
-# Function to update the AzerothCore source code
+# Function to download updates to AzerothCore
 update_source_code() {
     print_message $YELLOW "Updating your AzerothCore source code..." true
     cd "$AZEROTHCORE_DIR" || handle_error "Failed to change directory to $AZEROTHCORE_DIR"
     
-    sudo git pull origin master || handle_error "Git pull failed"
+    # Fetch updates from the remote repository (only update tracking branches)
+    git fetch origin || handle_error "Git fetch failed"
+    
+    # Automatically detect the default branch (e.g., 'main' or 'master')
+    DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
+    
+    # Check if there are any new commits in the remote repository
+    LOCAL=$(git rev-parse HEAD)
+    REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH")  # Use the detected default branch
+
+    if [ "$LOCAL" != "$REMOTE" ]; then
+        print_message $YELLOW "New commits found. Pulling updates..." true
+        # Pull the latest changes (merge them into the local branch)
+        git pull origin "$DEFAULT_BRANCH" || handle_error "Git pull failed"
+    else
+        print_message $GREEN "No new commits. Local repository is up to date." true
+    fi
+    
     print_message $GREEN "AzerothCore source code updated successfully.\n" true
 }
 
@@ -230,7 +247,7 @@ build_and_install_with_spinner() {
 
 # Function to run authserver for 60 seconds with countdown
 run_authserver() {
-    print_message $YELLOW "Starting authserver for 60 seconds..." true
+    print_message $YELLOW "Starting authserver for $COUNTDOWN seconds..." true
 
     # Check if authserver exists
     if [ ! -f "$AUTH_SERVER_EXEC" ]; then
