@@ -171,8 +171,8 @@ handle_menu_choice() {
             BUILD_ONLY=false
             ;;
         4)
-            export AZEROTHCORE_DIR
-            ./ACmod.sh || { print_message $RED "Failed to execute ACmod.sh. Ensure it exists and is executable." true; }
+            MODULE_DIR="${AZEROTHCORE_DIR}/modules"
+            update_modules "$MODULE_DIR"
             ;;
         5)
             print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
@@ -247,7 +247,7 @@ build_and_install_with_spinner() {
 
 # Function to run authserver for 60 seconds with countdown
 run_authserver() {
-    print_message $YELLOW "Starting authserver for $COUNTDOWN seconds..." true
+    print_message $YELLOW "Starting authserver and waiting for it to be ready..." true
 
     # Check if authserver exists
     if [ ! -f "$AUTH_SERVER_EXEC" ]; then
@@ -258,24 +258,30 @@ run_authserver() {
     "$AUTH_SERVER_EXEC" &
     AUTH_SERVER_PID=$!
 
-    # Countdown timer
-    COUNTDOWN=45
-    while [ $COUNTDOWN -gt 0 ]; do
-        if [ $COUNTDOWN -eq 1 ]; then
-            # Print countdown with singular "second", in green
-            echo -ne "${GREEN}Giving Authserver time to finish: $COUNTDOWN second  \r"
-        else
-            # Print countdown with plural "seconds", in green
-            echo -ne "${GREEN}Giving Authserver time to finish: $COUNTDOWN seconds \r"
-        fi
+    # Wait for the authserver to be ready by checking if the server is listening on the specified port
+    AUTH_SERVER_PORT=3724  # Replace this with the actual port your authserver uses
+    echo -ne "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT...\r"
+
+    # Wait for authserver to start accepting connections (max wait 60 seconds)
+    for i in {1..60}; do
+        # Check if port is open
+        nc -z localhost $AUTH_SERVER_PORT && break
         sleep 1
-        ((COUNTDOWN--))
     done
 
-    # Kill the authserver after 60 seconds
+    # If we didn't break out of the loop, the server isn't ready
+    if ! nc -z localhost $AUTH_SERVER_PORT; then
+        handle_error "Authserver did not start within the expected time frame."
+    fi
+
+    echo -ne "${GREEN}Authserver is ready! Waiting 5 seconds before closing...\r"
+    sleep 5
+
+    # Kill the authserver process
     kill "$AUTH_SERVER_PID"
     wait "$AUTH_SERVER_PID" 2>/dev/null  # Wait for the authserver process to properly exit
-    print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
+
+    print_message $GREEN "Authserver shutdown complete. Exiting. Thank you for using the AzerothCore rebuild tool!" true
     exit
 }
 
@@ -299,27 +305,178 @@ run_tmux_session() {
     tmux send-keys -t azeroth:0.0 "rename-pane 'Authserver'" C-m
     tmux send-keys -t azeroth:0.1 "rename-pane 'Worldserver'" C-m
 
-    # Run authserver in left pane and worldserver in right pane
+    # Run authserver in left pane
     tmux send-keys -t azeroth:0.0 "cd ~/azerothcore/env/dist/bin && ./authserver" C-m
-    sleep 10
+
+    # Wait for the authserver to be ready (port 3724 open)
+    AUTH_SERVER_PORT=3724  # Port used by authserver
+    echo -ne "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT...\r"
+
+    # Wait for authserver to start accepting connections (max wait 60 seconds)
+    for i in {1..60}; do
+        # Check if port is open
+        nc -z localhost $AUTH_SERVER_PORT && break
+        sleep 1
+    done
+
+    # If we didn't break out of the loop, the authserver isn't ready
+    if ! nc -z localhost $AUTH_SERVER_PORT; then
+        handle_error "Authserver did not start within the expected time frame."
+    fi
+
+    # Once authserver is ready, start the worldserver in the right pane
     tmux send-keys -t azeroth:0.1 "cd ~/azerothcore/env/dist/bin && ./worldserver" C-m
 
     # Detach from the tmux session
     tmux detach -s azeroth
 
-    # Print the updated, epic message after clearing the screen
+   # Print the updated, hilarious message after worldserver starts
     clear  # Clear the screen before displaying the message
     print_message $CYAN "----------------------------------------------------"
-    print_message $WHITE "\n  AzerothCore has been reawakened!"
-    print_message $WHITE "  The server is ready, but there's a new challenge..."
+    print_message $WHITE "\n  Congrats, Admin! AzerothCore is officially live!"
     echo ""
-    print_message $YELLOW "  The NPCs have become sentient and they want royalties"
-    print_message $YELLOW "  They've started forming a union. Negotiations begin soon."
+    print_message $YELLOW "  You have just unleashed a digital world where anything can go wrong."
+    print_message $YELLOW "  But hey, that’s what backups are for, right?"
     echo ""
-    print_message $CYAN "  Settle the negotiations: 'tmux attach -t azeroth'"
+    print_message $CYAN "  Now sit back, relax, and wait for the chaos to begin."
+    print_message $CYAN "  Or... maybe just keep an eye on it. You know, for safety."
+    echo ""
+    print_message $WHITE "  To rule Azeroth, type: 'tmux attach -t azeroth'"
     print_message $CYAN "----------------------------------------------------" 
     echo ""  # Add some space before closing
     exit
+}
+
+# Function to run a command and capture its output
+run_command() {
+    local command=$1
+    local cwd=$2
+    if [ -z "$cwd" ]; then
+        eval "$command"
+    else
+        (cd "$cwd" && eval "$command")
+    fi
+}
+
+# Function to update a specific module by pulling the latest changes
+update_module() {
+    local module_dir=$1
+    echo -e "${BLUE}Pulling the latest changes for $module_dir...${NC}"
+    run_command "git pull origin HEAD" "$module_dir"
+    echo -e "${GREEN}Successfully updated $module_dir.${NC}"
+}
+
+# Function to check for updates in modules
+update_modules() {
+    local module_dir=$1
+
+    if [ ! -d "$module_dir" ]; then
+        echo -e "${RED}Error: The directory $module_dir does not exist.${NC}"
+        return
+    fi
+
+    echo -e "${BLUE}=== Starting Update Check for Modules ===${NC}"
+    echo -e "${CYAN}Checking for updates in the directory: $module_dir${NC}"
+
+    modules_with_updates=()
+
+    for module in "$module_dir"/*; do
+        if [ -d "$module" ] && [ -d "$module/.git" ]; then
+            echo -e "${GREEN}Found Git repository: $module${NC}"
+
+            # Fetch the latest changes from the remote repository
+            run_command "git fetch origin" "$module"
+
+            local=$(run_command "git rev-parse @" "$module")
+            remote=$(run_command "git rev-parse @{u}" "$module")
+
+            if [ "$local" != "$remote" ]; then
+                echo -e "${YELLOW}Update available for $(basename $module)!${NC}"
+                modules_with_updates+=("$module")
+            else
+                echo -e "${GREEN}$(basename $module) is already up to date.${NC}"
+            fi
+            echo
+        fi
+    done
+
+    if [ ${#modules_with_updates[@]} -eq 0 ]; then
+        echo -e "${GREEN}No updates found for any modules.${NC}"
+        return
+    fi
+
+    while true; do
+        echo -e "${CYAN}=== Available Updates ===${NC}"
+
+        if [ ${#modules_with_updates[@]} -gt 0 ]; then
+            echo -e "${YELLOW}The following modules have updates available:${NC}"
+            for module in "${modules_with_updates[@]}"; do
+                echo -e "- $(basename $module)"
+            done
+        fi
+
+        echo -e "\n${YELLOW}Select an action:${NC}"
+        echo -e "1. Update all modules"
+        echo -e "2. Update specific modules"
+        echo -e "3. Quit"
+
+        # Separate the prompt color from user input
+        echo -e -n "${CYAN}Enter your choice (1, 2, or 3): ${NC}"
+        read choice
+
+        if [ "$choice" == "3" ]; then
+            echo -e "${GREEN}Exiting without updating any modules.${NC}"
+            return
+        elif [ "$choice" == "1" ]; then
+            echo -e -n "${YELLOW}Are you sure you want to update all modules? (y/n): ${NC}"
+            read confirm
+            if [ "${confirm,,}" == "y" ]; then
+                for module in "${modules_with_updates[@]}"; do
+                    update_module "$module"
+                done
+                echo -e "${GREEN}All selected modules have been updated successfully. Exiting...${NC}"
+                return
+            else
+                echo -e "${RED}Update canceled.${NC}"
+            fi
+        elif [ "$choice" == "2" ]; then
+            while true; do
+                echo -e "${CYAN}Available modules for update:${NC}"
+                if [ ${#modules_with_updates[@]} -eq 0 ]; then
+                    echo -e "${GREEN}No more modules available to update.${NC}"
+                    return  # Return to main menu
+                fi
+                for i in "${!modules_with_updates[@]}"; do
+                    echo -e "$((i+1)). $(basename ${modules_with_updates[i]})"
+                done
+                echo -e "$(( ${#modules_with_updates[@]} + 1 )). Back"
+
+                echo -e -n "${YELLOW}Enter module number to update or $(( ${#modules_with_updates[@]} + 1 )) to go back: ${NC}"
+                read specific_choice
+
+                if [ "$specific_choice" -eq $(( ${#modules_with_updates[@]} + 1 )) ]; then
+                    # Break out of this specific modules menu
+                    break
+                fi
+
+                if [ "$specific_choice" -ge 1 ] && [ "$specific_choice" -le ${#modules_with_updates[@]} ]; then
+                    module_index=$((specific_choice-1))
+                    module_path=${modules_with_updates[$module_index]}
+                    echo -e -n "${YELLOW}Are you sure you want to update $(basename $module_path)? (y/n): ${NC}"
+                    read confirm
+                    if [ "${confirm,,}" == "y" ]; then
+                        update_module "$module_path"
+                        unset modules_with_updates[$module_index]
+                        modules_with_updates=("${modules_with_updates[@]}") # Re-index array
+                    else
+                        echo -e "${RED}Update canceled for $(basename $module_path).${NC}"
+                    fi
+                else
+                    echo -e "${RED}Invalid module number: $specific_choice${NC}"
+                fi
+            done
+        fi
+    done
 }
 
 # Main function to start the script
@@ -361,6 +518,7 @@ main_menu() {
         # Reset action flags after execution
         RUN_SERVER=false
         BUILD_ONLY=false
+		
     done
 }
 
