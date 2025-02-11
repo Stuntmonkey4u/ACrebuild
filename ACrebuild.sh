@@ -226,7 +226,6 @@ ask_for_cores() {
     fi
 }
 
-# Function to build and install AzerothCore with spinner
 build_and_install_with_spinner() {
     print_message $YELLOW "Building and installing AzerothCore..." true
 
@@ -241,7 +240,23 @@ build_and_install_with_spinner() {
     cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed"
 
     # Run the build process using the specified number of cores
-    make -j "$CORES" install || handle_error "Build failed"
+    if ! make -j "$CORES" install; then
+        # If the build fails, offer to run "make clean"
+        print_message $YELLOW "Build failed. Would you like to run 'make clean' to attempt to fix the issue? (y/n)" true
+        read -r clean_answer
+        if [[ "$clean_answer" =~ ^[Yy]$ ]]; then
+            print_message $YELLOW "Running 'make clean' to attempt recovery..." true
+            make clean || { print_message $RED "'make clean' failed. Exiting." true; exit 1; }
+            # After clean, try building again
+            print_message $YELLOW "Retrying the build..." true
+            if ! make -j "$CORES" install; then
+                handle_error "Build failed again after running make clean."
+            fi
+        else
+            handle_error "Build failed and clean was not run. Exiting."
+        fi
+    fi
+
     print_message $GREEN "AzerothCore build and installation completed successfully." true
 }
 
