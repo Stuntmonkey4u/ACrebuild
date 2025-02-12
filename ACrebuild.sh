@@ -15,6 +15,7 @@ AZEROTHCORE_DIR="$HOME/azerothcore"
 BUILD_DIR="$AZEROTHCORE_DIR/build"
 AUTH_SERVER_EXEC="$HOME/azerothcore/env/dist/bin/authserver"
 WORLD_SERVER_EXEC="$HOME/azerothcore/env/dist/bin/worldserver"
+BACKUP_DIR="$HOME/azerothcore_backups"
 
 # Function to print the message with a specific color and optional bold text
 print_message() {
@@ -150,13 +151,13 @@ show_menu() {
     print_message $YELLOW "2) Rebuild the Server Only" false
     print_message $YELLOW "3) Run the Server (Without Building)" false
     print_message $YELLOW "4) Update Server Modules" false
-    print_message $YELLOW "5) Exit" false
+    print_message $YELLOW "5) Backup and Restore Database" false
+    print_message $YELLOW "6) Exit" false
     echo ""
 }
 
-# Function to handle user input for the menu
 handle_menu_choice() {
-    read -p "Enter choice [1-5]: " choice
+    read -p "Enter choice [1-6]: " choice
     case $choice in
         1)
             RUN_SERVER=true
@@ -175,11 +176,17 @@ handle_menu_choice() {
             update_modules "$MODULE_DIR"
             ;;
         5)
+            while true; do
+                show_backup_menu
+                handle_backup_menu_choice
+            done
+            ;;
+        6)
             print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
             exit 0
             ;;
         *)
-            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+            print_message $RED "Invalid choice. Please select a valid option (1-6)." false
             return
             ;;
     esac
@@ -541,6 +548,174 @@ main_menu() {
 handle_error() {
     print_message $RED "$1" true
     exit 1
+}
+# Function to prompt the user for MySQL credentials
+get_mysql_credentials() {
+    print_message $CYAN "Please enter your MySQL username:" true
+    read -p "MySQL Username: " MYSQL_USER
+    print_message $CYAN "Please enter your MySQL password:" true
+    read -s -p "MySQL Password: " MYSQL_PASSWORD
+    echo ""  # For a clean line after the password input
+}
+
+# Function to create the backup directory if it doesn't exist
+create_backup_directory() {
+    if [ ! -d "$BACKUP_DIR" ]; then
+        mkdir -p "$BACKUP_DIR"
+        if [ $? -eq 0 ]; then
+            print_message $GREEN "Backup directory created: $BACKUP_DIR" true
+        else
+            print_message $RED "Error creating backup directory: $BACKUP_DIR" true
+            exit 1
+        fi
+    fi
+}
+
+
+
+# Function to list available databases
+list_databases() {
+    # Connect to MySQL and list databases
+    DATABASES=$(mysql -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" -e "SHOW DATABASES;" | tail -n +2)
+    if [ $? -ne 0 ]; then
+        print_message $RED "Error: Unable to connect to MySQL with the provided credentials." true
+        return 1
+    fi
+
+    print_message $CYAN "Available Databases:" true
+    echo "$DATABASES"
+}
+
+# Function to select databases for backup
+select_databases_to_backup() {
+    # List available databases
+    list_databases
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+
+    # Ask the user which databases to back up
+    print_message $YELLOW "Enter the names of databases to back up, separated by space (or press Enter to backup all):" true
+    read -r selected_databases
+
+    if [ -z "$selected_databases" ]; then
+        # If no selection, default to backup of known important databases
+        selected_databases="acore_auth acore_characters acore_playerbots acore_world"
+    fi
+
+    # Backup the selected databases
+    for db in $selected_databases; do
+        if echo "$DATABASES" | grep -q "^$db$"; then
+            backup_database "$db"
+        else
+            print_message $RED "Database '$db' does not exist on this server." true
+        fi
+    done
+}
+
+# Function to back up a database
+backup_database() {
+    local db="$1"
+    print_message $CYAN "Backing up database: $db..." true
+
+    # Ensure the backup directory exists before starting backup
+    create_backup_directory
+
+    # Get the current date to name the backup file
+    DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+    BACKUP_FILE="$BACKUP_DIR/${db}_backup_$DATE.sql.gz"
+
+    # Run mysqldump and compress the backup
+    mysqldump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$db" | gzip > "$BACKUP_FILE"
+
+    # Check if the backup was successful
+    if [ $? -eq 0 ]; then
+        print_message $GREEN "Backup successful! $db saved as $BACKUP_FILE" true
+    else
+        print_message $RED "Backup failed for $db." true
+    fi
+}
+
+# Function to list the existing backups
+list_backups() {
+    # Ensure the backup directory exists before listing backups
+    create_backup_directory
+
+    print_message $CYAN "Listing all backups in $BACKUP_DIR..." true
+    ls -lh "$BACKUP_DIR"
+}
+
+# Function to restore a database from a backup
+restore_database() {
+print_message $CYAN "Listing all backups in $BACKUP_DIR..." true
+    ls -lh "$BACKUP_DIR"
+
+    # Ask the user which backup to restore
+    print_message $YELLOW "Enter the backup file name (with .sql.gz) to restore from:" true
+    read -r backup_file
+
+    # Ensure the file exists
+    if [ ! -f "$BACKUP_DIR/$backup_file" ]; then
+        print_message $RED "Backup file $backup_file does not exist." true
+        return
+    fi
+
+    # Restore the database from the backup file
+    gunzip < "$BACKUP_DIR/$backup_file" | mysql -u "$MYSQL_USER" -p"$MYSQL_PASSWORD"
+
+    # Check if the restore was successful
+    if [ $? -eq 0 ]; then
+        print_message $GREEN "Database restore successful from $backup_file" true
+    else
+        print_message $RED "Database restore failed." true
+    fi
+}
+
+# Function to delete backups older than a specified number of days
+delete_old_backups() {
+    DAYS_TO_KEEP=7 # Number of days to keep backups
+    find "$BACKUP_DIR" -type f -name "*.sql.gz" -mtime +$DAYS_TO_KEEP -exec rm {} \;
+    print_message $GREEN "Deleted backups older than $DAYS_TO_KEEP days." true
+}
+
+# Function to show the backup menu
+show_backup_menu() {
+    echo ""
+    print_message $YELLOW "Select an option for database backup:" true
+    echo ""
+    print_message $YELLOW "1) Create a New Backup" false
+    print_message $YELLOW "2) List Existing Backups" false
+    print_message $YELLOW "3) Restore a Backup" false
+    print_message $YELLOW "4) Delete Old Backups" false
+    print_message $YELLOW "5) Return to Main Menu" false
+    echo ""
+}
+
+# Function to handle the backup menu input
+handle_backup_menu_choice() {
+    read -p "Enter choice [1-5]: " choice
+    case $choice in
+        1)
+            get_mysql_credentials
+            select_databases_to_backup
+            ;;
+        2)
+            list_backups
+            ;;
+        3)
+            restore_database
+            ;;
+        4)
+            delete_old_backups
+            ;;
+        5)
+            main_menu
+            ;;
+        *)
+            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+            return
+            ;;
+    esac
 }
 
 # Run the main menu function when the script starts
