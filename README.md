@@ -58,7 +58,11 @@ This script is provided as-is, with no warranties or guarantees. Use at your own
 
 ---
 
-## Credits (So Far...)
+## Contributors (So Far...)
 
 Created by Stuntmonkey4u
+
+## Pull Request
+
+If you have an improvement or idea, make a pull request, get your name added to the Contributors list!!
 
