@@ -637,9 +637,9 @@ handle_error() {
     print_message $RED "ERROR: $1" true
     if [[ "$1" == *"CMake configuration failed"* || "$1" == *"Build process ('make install') failed"* ]]; then
         print_message $RED "Suggestion: Check the logs in your build directory ($BUILD_DIR) for more details." true
-    elif [[ "$1" == *"authserver executable not found"* ]];
+    elif [[ "$1" == *"authserver executable not found"* ]]; then # Added missing 'then' here
         print_message $RED "Suggestion: Ensure AzerothCore was built successfully and the path is correct." true
-    elif [[ "$1" == *"TMUX session"* ]];
+    elif [[ "$1" == *"TMUX session"* ]]; then
         print_message $RED "Suggestion: Ensure TMUX is installed ('sudo apt install tmux') and functioning correctly." true
     fi
     print_message $RED "--------------------------------------------------------------------" true
