@@ -54,31 +54,43 @@ check_dependencies() {
 
 # Function to ask if the user wants to install missing dependencies
 ask_to_install_dependencies() {
+    echo ""
     print_message $YELLOW "The following dependencies are required but missing: ${MISSING_DEPENDENCIES[*]}" true
-    print_message $YELLOW "Would you like to install them now? (y/n)" true
+    print_message $YELLOW "Would you like to try and install them now? (y/n)" true
     read -r answer
     if [[ "$answer" =~ ^[Yy]$ ]]; then
         install_dependencies
-        print_message $GREEN "Dependencies installed. Returning to main menu..." true
-        sleep 2
+        echo ""
+        print_message $GREEN "Dependencies installation attempt finished." true
+        print_message $BLUE "Please check the output above for any errors. Returning to main menu..." true
+        sleep 3
         main_menu
     else
-        print_message $RED "Cannot proceed without the required dependencies. Exiting..." true
+        echo ""
+        print_message $RED "--------------------------------------------------------------------" true
+        print_message $RED "Critical: Cannot proceed without the required dependencies. Exiting..." true
+        print_message $RED "--------------------------------------------------------------------" true
         exit 1
     fi
 }
 
 # Function to install the missing dependencies
 install_dependencies() {
+    print_message $BLUE "Attempting to install missing dependencies..." true
     for DEP in "${MISSING_DEPENDENCIES[@]}"; do
-        sudo apt install -y "$DEP" || { print_message $RED "Failed to install $DEP. Exiting." true; exit 1; }
+        print_message $YELLOW "Installing $DEP..." false
+        sudo apt install -y "$DEP" || { print_message $RED "Error: Failed to install $DEP. Please install it manually and restart the script. Exiting." true; exit 1; }
+        print_message $GREEN "$DEP installed successfully." false
     done
 }
 
 # Function to ask the user where their AzerothCore is installed
 ask_for_core_installation_path() {
-    print_message $YELLOW "Where is your existing AzerothCore installation located? (default: $HOME/azerothcore)" true
+    echo ""
+    print_message $YELLOW "Where is your existing AzerothCore installation located?" true
+    print_message $YELLOW "Press ENTER to use the default path: ($HOME/azerothcore)" false
     read -r user_input
+    echo ""
 
     # If user input is empty, use default path
     if [ -z "$user_input" ]; then
@@ -131,11 +143,11 @@ welcome_message() {
     print_message $BLUE "Welcome to AzerothCore Rebuild!           " true
     print_message $BLUE "----------------------------------------------" true
     echo ""
-    print_message $BLUE "This script helps you manage your existing AzerothCore server by allowing you to:" true
-    print_message $BLUE "  - Update the AzerothCore source code" true
-    print_message $BLUE "  - Rebuild the server with the latest changes" true
-    print_message $BLUE "  - Run your AzerothCore server" true
-    print_message $BLUE "  - Update server module" true
+    print_message $BLUE "This script provides an interactive way to manage your AzerothCore server, including:" true
+    print_message $BLUE "  - Updating the AzerothCore source code." true
+    print_message $BLUE "  - Rebuilding the server with the latest changes." true
+    print_message $BLUE "  - Running your AzerothCore server (authserver and worldserver)." true
+    print_message $BLUE "  - Updating server modules conveniently." true
     echo ""
     print_message $BLUE "----------------------------------------------" true
     echo ""
@@ -144,42 +156,81 @@ welcome_message() {
 # Function to display the menu
 show_menu() {
     echo ""
+    print_message $BLUE "-------------------- MAIN MENU ---------------------" true
     print_message $YELLOW "Select an option from the menu below:" true
     echo ""
-    print_message $YELLOW "1) Rebuild and Run the Server" false
-    print_message $YELLOW "2) Rebuild the Server Only" false
-    print_message $YELLOW "3) Run the Server (Without Building)" false
-    print_message $YELLOW "4) Update Server Modules" false
-    print_message $YELLOW "5) Exit" false
+    print_message $YELLOW "[R] Rebuild and Run Server (1)" false
+    print_message $YELLOW "[B] Rebuild Server Only (2)" false
+    print_message $YELLOW "[S] Run Server Only (3)" false
+    print_message $YELLOW "[M] Update Server Modules (4)" false
+    print_message $YELLOW "[C] Show Current Configuration (5)" false
+    print_message $YELLOW "[Q] Quit Script (6)" false
     echo ""
+    print_message $BLUE "----------------------------------------------------" true
+}
+
+# Function to display current configuration
+show_current_configuration() {
+    echo ""
+    print_message $BLUE "---------------- CURRENT CONFIGURATION ---------------" true
+    echo ""
+    print_message $GREEN "AzerothCore Directory: $AZEROTHCORE_DIR" false
+    print_message $GREEN "Build Directory:       $BUILD_DIR" false
+    print_message $GREEN "Auth Server Exec:    $AUTH_SERVER_EXEC" false
+    print_message $GREEN "World Server Exec:   $WORLD_SERVER_EXEC" false
+    
+    if [ -n "$CORES" ]; then
+        print_message $GREEN "Cores for Building:    $CORES" false
+    else
+        print_message $YELLOW "Cores for Building:    Not yet set (will be asked before build)." false
+    fi
+    echo ""
+    print_message $BLUE "----------------------------------------------------" true
+    echo ""
+    read -n 1 -s -r -p "Press any key to return to the main menu..."
+    echo "" # Add a newline after the key press
 }
 
 # Function to handle user input for the menu
 handle_menu_choice() {
-    read -p "Enter choice [1-5]: " choice
+    echo ""
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, B, S, M, C, Q, or 1-6]: ${NC}")" choice
     case $choice in
-        1)
+        1|[Rr])
             RUN_SERVER=true
             BUILD_ONLY=true
             ;;
-        2)
+        2|[Bb])
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        3)
+        3|[Ss])
             RUN_SERVER=true
             BUILD_ONLY=false
             ;;
-        4)
+        4|[Mm])
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
+            # Ensure flags are reset if returning from module update without other actions
+            RUN_SERVER=false 
+            BUILD_ONLY=false
+            return # Return to main menu to avoid falling through
             ;;
-        5)
-            print_message $GREEN "Exiting. Thank you for using the AzerothCore rebuild tool!" true
+        5|[Cc])
+            show_current_configuration
+            # Ensure flags are reset if returning from status display
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return # Return to main menu to avoid falling through
+            ;;
+        6|[Qq])
+            echo ""
+            print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0
             ;;
         *)
-            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+            echo ""
+            print_message $RED "Invalid choice. Please select a valid option (R, B, S, M, C, Q, or 1-6)." false
             return
             ;;
     esac
@@ -187,6 +238,7 @@ handle_menu_choice() {
 
 # Function to ask for confirmation before updating or building
 ask_for_update_confirmation() {
+    echo ""
     while true; do
         print_message $YELLOW "Would you like to update the AzerothCore source code before rebuilding? (y/n)" true
         read -r confirmation
@@ -194,9 +246,11 @@ ask_for_update_confirmation() {
             update_source_code
             break
         elif [[ "$confirmation" =~ ^[Nn]$ ]]; then
-            print_message $GREEN "Skipping update. Proceeding with build.\n" true
+            echo ""
+            print_message $GREEN "Skipping source code update. Proceeding with build preparation...\n" true
             break
         else
+            echo ""
             print_message $RED "Invalid input. Please enter 'y' for yes or 'n' for no." false
         fi
     done
@@ -209,49 +263,66 @@ ask_for_update_confirmation() {
 ask_for_cores() {
     # Get the number of available CPU cores
     AVAILABLE_CORES=$(nproc)
-
-    # Ask the user for the number of cores to use for building (default to all cores)
-    print_message $YELLOW "Available CPU cores: $AVAILABLE_CORES"
-    read -p "Enter the number of cores to use for building (default: all cores): " CORES
+    echo ""
+    print_message $YELLOW "CPU Core Selection for Building:" true
+    print_message $YELLOW "Available CPU cores: $AVAILABLE_CORES" false
+    print_message $YELLOW "Press ENTER to use all available cores ($AVAILABLE_CORES)." false
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter the number of cores to use (e.g., 1, 2, $AVAILABLE_CORES): ${NC}")" CORES
+    echo ""
 
     # If user input is empty, default to using all cores
     if [ -z "$CORES" ]; then
         CORES=$AVAILABLE_CORES
         print_message $GREEN "Using all $CORES cores for the build." true
+    elif ! [[ "$CORES" =~ ^[0-9]+$ ]]; then
+        print_message $RED "Invalid input: '$CORES' is not a number. Defaulting to $AVAILABLE_CORES cores." true
+        CORES=$AVAILABLE_CORES
+    elif [ "$CORES" -eq 0 ]; then
+        print_message $RED "You cannot use 0 cores. Defaulting to 1 core." true
+        CORES=1
     elif [ "$CORES" -gt "$AVAILABLE_CORES" ]; then
-        print_message $RED "You cannot use more cores than available. Defaulting to $AVAILABLE_CORES cores." true
+        print_message $RED "You cannot use more cores than available ($AVAILABLE_CORES). Defaulting to $AVAILABLE_CORES cores." true
         CORES=$AVAILABLE_CORES
     else
-        print_message $GREEN "Using $CORES cores for the build." true
+        print_message $GREEN "Using $CORES core(s) for the build." true
     fi
 }
 
 # Function to build and install AzerothCore with spinner
 build_and_install_with_spinner() {
-    print_message $YELLOW "Building and installing AzerothCore..." true
+    echo ""
+    print_message $BLUE "--- Starting AzerothCore Build and Installation ---" true
+    print_message $YELLOW "Building and installing AzerothCore... This may take a while." true
 
     # Ensure BUILD_DIR is correctly updated
     if [ ! -d "$BUILD_DIR" ]; then
-        handle_error "Build directory $BUILD_DIR does not exist."
+        handle_error "Build directory $BUILD_DIR does not exist. Please check your AzerothCore path."
     fi
 
     # Run cmake with the provided options
-    cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR"
+    cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR. Ensure the path is correct."
 
-    cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed"
+    echo ""
+    print_message $CYAN "Running CMake configuration..." true
+    cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed. Check CMake logs in $BUILD_DIR for details."
 
-    # Run the build process using the specified number of cores
-    make -j "$CORES" install || handle_error "Build failed"
-    print_message $GREEN "AzerothCore build and installation completed successfully." true
+    echo ""
+    print_message $CYAN "Running make install with $CORES core(s)..." true
+    make -j "$CORES" install || handle_error "Build process ('make install') failed. Check the output above and logs in $BUILD_DIR for details."
+    echo ""
+    print_message $GREEN "--- AzerothCore Build and Installation Completed Successfully ---" true
 }
 
 # Function to run authserver for 60 seconds with countdown
 run_authserver() {
+    echo ""
+    print_message $BLUE "--- Temporary Authserver Run (Test Build) ---" true
     print_message $YELLOW "Starting authserver and waiting for it to be ready..." true
+    echo ""
 
     # Check if authserver exists
     if [ ! -f "$AUTH_SERVER_EXEC" ]; then
-        handle_error "authserver executable not found at $AUTH_SERVER_EXEC"
+        handle_error "Authserver executable not found at $AUTH_SERVER_EXEC. Build might have failed or path is incorrect."
     fi
 
     # Run the authserver in the background
@@ -259,41 +330,45 @@ run_authserver() {
     AUTH_SERVER_PID=$!
 
     # Wait for the authserver to be ready by checking if the server is listening on the specified port
-    AUTH_SERVER_PORT=3724  # Replace this with the actual port your authserver uses
-    echo -ne "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT...\r"
-
-    # Wait for authserver to start accepting connections (max wait 60 seconds)
+    AUTH_SERVER_PORT=3724 
+    print_message $CYAN "Waiting for authserver to be ready on port $AUTH_SERVER_PORT (max 60 seconds)..." false
+    
+    # Simple spinner
     for i in {1..60}; do
-        # Check if port is open
+        echo -ne "${CYAN}Checking port $AUTH_SERVER_PORT: attempt $i/60 ${SPINNER[$((i % ${#SPINNER[@]}))]} \r${NC}"
         nc -z localhost $AUTH_SERVER_PORT && break
         sleep 1
     done
+    echo -ne "\r${NC}                                                                          \r" # Clear spinner line
 
-    # If we didn't break out of the loop, the server isn't ready
     if ! nc -z localhost $AUTH_SERVER_PORT; then
-        handle_error "Authserver did not start within the expected time frame."
+        handle_error "Authserver did not start or become ready on port $AUTH_SERVER_PORT within 60 seconds."
     fi
 
-    echo -ne "${GREEN}Authserver is ready! Waiting 5 seconds before closing...\r"
-    sleep 5
+    print_message $GREEN "Authserver is ready! It will run for a few seconds then shut down." true
+    sleep 5 
 
     # Kill the authserver process
+    print_message $YELLOW "Shutting down temporary authserver..." true
     kill "$AUTH_SERVER_PID"
-    wait "$AUTH_SERVER_PID" 2>/dev/null  # Wait for the authserver process to properly exit
+    wait "$AUTH_SERVER_PID" 2>/dev/null 
 
-    print_message $GREEN "Authserver shutdown complete. Exiting. Thank you for using the AzerothCore rebuild tool!" true
-    exit
+    echo ""
+    print_message $GREEN "Temporary authserver shutdown complete." true
+    print_message $BLUE "Returning to main menu..." true
+    sleep 2 # Give user time to read message
 }
 
 # Function to run worldserver and authserver in tmux session
 run_tmux_session() {
-    # Clear the screen to avoid jumbled output
     clear
-
-    print_message $YELLOW "Starting Azerothcore" false
+    echo ""
+    print_message $BLUE "--- Starting AzerothCore Servers in TMUX ---" true
+    print_message $YELLOW "Attempting to start authserver and worldserver in a new TMUX session named 'azeroth'..." false
+    echo ""
 
     # Start a new tmux session named "azeroth", attach to it immediately (we don't want to start it detached)
-    tmux new-session -s azeroth -d
+    tmux new-session -s azeroth -d || handle_error "Failed to create new TMUX session. Is TMUX installed and working?"
 
     # Wait for tmux session to initialize
     sleep 1
@@ -309,42 +384,47 @@ run_tmux_session() {
     tmux send-keys -t azeroth:0.0 "cd ~/azerothcore/env/dist/bin && ./authserver" C-m
 
     # Wait for the authserver to be ready (port 3724 open)
-    AUTH_SERVER_PORT=3724  # Port used by authserver
-    echo -ne "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT...\r"
+    AUTH_SERVER_PORT=3724
+    print_message $CYAN "Waiting for authserver to be ready on port $AUTH_SERVER_PORT (max 60 seconds)..." false
 
-    # Wait for authserver to start accepting connections (max wait 60 seconds)
+    # Simple spinner for waiting
+    SPINNER=('\' '|' '/' '-')
     for i in {1..60}; do
-        # Check if port is open
+        echo -ne "${CYAN}Checking port $AUTH_SERVER_PORT: attempt $i/60 ${SPINNER[$((i % ${#SPINNER[@]}))]} \r${NC}"
         nc -z localhost $AUTH_SERVER_PORT && break
         sleep 1
     done
+    echo -ne "\r${NC}                                                                          \r" # Clear spinner line
 
-    # If we didn't break out of the loop, the authserver isn't ready
     if ! nc -z localhost $AUTH_SERVER_PORT; then
-        handle_error "Authserver did not start within the expected time frame."
+        handle_error "Authserver did not start or become ready on port $AUTH_SERVER_PORT within 60 seconds. Check TMUX session 'azeroth' for errors."
     fi
-
+    
+    print_message $GREEN "Authserver appears to be ready." true
+    echo ""
+    print_message $YELLOW "Starting worldserver in the other TMUX pane..." true
     # Once authserver is ready, start the worldserver in the right pane
-    tmux send-keys -t azeroth:0.1 "cd ~/azerothcore/env/dist/bin && ./worldserver" C-m
+    tmux send-keys -t azeroth:0.1 "cd $AZEROTHCORE_DIR/env/dist/bin && ./worldserver" C-m
 
     # Detach from the tmux session
     tmux detach -s azeroth
 
    # Print the updated, hilarious message after worldserver starts
-    clear  # Clear the screen before displaying the message
-    print_message $CYAN "----------------------------------------------------"
-    print_message $WHITE "\n  Congrats, Admin! AzerothCore is officially live!"
+    clear 
     echo ""
-    print_message $YELLOW "  You have just unleashed a digital world where anything can go wrong."
-    print_message $YELLOW "  But hey, that’s what backups are for, right?"
+    print_message $CYAN "----------------------------------------------------------------------" true
+    print_message $WHITE "\n  🚀 Congrats, Admin! AzerothCore should now be LIVE in TMUX! 🚀" true
     echo ""
-    print_message $CYAN "  Now sit back, relax, and wait for the chaos to begin."
-    print_message $CYAN "  Or... maybe just keep an eye on it. You know, for safety."
+    print_message $YELLOW "  You've just launched a world of adventure (and potential bugs)." true
+    print_message $YELLOW "  Remember, with great power comes great responsibility... to check the logs." true
     echo ""
-    print_message $WHITE "  To rule Azeroth, type: 'tmux attach -t azeroth'"
-    print_message $CYAN "----------------------------------------------------" 
-    echo ""  # Add some space before closing
-    exit
+    print_message $CYAN "  To manage your server and witness the (hopefully orderly) chaos:" true
+    print_message $WHITE "    ${BOLD}tmux attach -t azeroth${NC}" true
+    echo ""
+    print_message $CYAN "  Inside TMUX: Ctrl+B, then D to detach. Use arrow keys for panes." true
+    print_message $CYAN "----------------------------------------------------------------------" true
+    echo "" 
+    exit 0
 }
 
 # Function to run a command and capture its output
@@ -371,110 +451,136 @@ update_modules() {
     local module_dir=$1
 
     if [ ! -d "$module_dir" ]; then
-        echo -e "${RED}Error: The directory $module_dir does not exist.${NC}"
+        echo ""
+        print_message $RED "Error: The module directory '$module_dir' does not exist." true
+        print_message $RED "Please ensure the path is correct or create the directory if necessary." true
         return
     fi
 
-    echo -e "${BLUE}=== Starting Update Check for Modules ===${NC}"
-    echo -e "${CYAN}Checking for updates in the directory: $module_dir${NC}"
+    echo ""
+    print_message $BLUE "=== Starting Update Check for Modules in '$module_dir' ===" true
+    echo ""
 
     modules_with_updates=()
+    found_git_repo=false
 
     for module in "$module_dir"/*; do
         if [ -d "$module" ] && [ -d "$module/.git" ]; then
-            echo -e "${GREEN}Found Git repository: $module${NC}"
+            found_git_repo=true
+            print_message $GREEN "Found Git repository: $(basename "$module")" false
 
             # Fetch the latest changes from the remote repository
+            print_message $CYAN "Fetching updates for $(basename "$module")..." false
             run_command "git fetch origin" "$module"
 
             local=$(run_command "git rev-parse @" "$module")
-            remote=$(run_command "git rev-parse @{u}" "$module")
+            remote=$(run_command "git rev-parse @{u}" "$module") # Check against upstream tracking branch
 
             if [ "$local" != "$remote" ]; then
-                echo -e "${YELLOW}Update available for $(basename $module)!${NC}"
+                print_message $YELLOW "Update available for $(basename "$module")!" true
                 modules_with_updates+=("$module")
             else
-                echo -e "${GREEN}$(basename $module) is already up to date.${NC}"
+                print_message $GREEN "$(basename "$module") is already up to date." true
             fi
-            echo
+            echo "" 
         fi
     done
 
+    if ! $found_git_repo; then
+        echo ""
+        print_message $YELLOW "No Git repositories found in subdirectories of '$module_dir'." true
+        print_message $BLUE "Module updates are skipped if no .git directories are present in module subfolders." true
+        return
+    fi
+    
     if [ ${#modules_with_updates[@]} -eq 0 ]; then
-        echo -e "${GREEN}No updates found for any modules.${NC}"
+        echo ""
+        print_message $GREEN "All modules with Git repositories are already up to date." true
         return
     fi
 
     while true; do
-        echo -e "${CYAN}=== Available Updates ===${NC}"
-
+        echo ""
+        print_message $CYAN "=== Module Update Options ===" true
         if [ ${#modules_with_updates[@]} -gt 0 ]; then
-            echo -e "${YELLOW}The following modules have updates available:${NC}"
-            for module in "${modules_with_updates[@]}"; do
-                echo -e "- $(basename $module)"
+            print_message $YELLOW "The following modules have updates available:" true
+            for module_path_item in "${modules_with_updates[@]}"; do
+                print_message $YELLOW "  - $(basename "$module_path_item")" false
             done
         fi
-
-        echo -e "\n${YELLOW}Select an action:${NC}"
-        echo -e "1. Update all modules"
-        echo -e "2. Update specific modules"
-        echo -e "3. Quit"
-
+        echo ""
+        print_message $YELLOW "Select an action:" false
+        print_message $YELLOW "[A] Update all listed modules (1)" false
+        print_message $YELLOW "[S] Update specific modules (2)" false
+        print_message $YELLOW "[Q] Quit module update (3)" false
+        echo ""
         # Separate the prompt color from user input
-        echo -e -n "${CYAN}Enter your choice (1, 2, or 3): ${NC}"
-        read choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice ([A]ll, [S]pecific, [Q]uit, or 1-3): ${NC}")" choice
+        echo ""
 
-        if [ "$choice" == "3" ]; then
-            echo -e "${GREEN}Exiting without updating any modules.${NC}"
+        if [[ "$choice" == "3" || "$choice" =~ ^[Qq]$ ]]; then
+            print_message $GREEN "Exiting module update. Returning to main menu..." true
             return
-        elif [ "$choice" == "1" ]; then
-            echo -e -n "${YELLOW}Are you sure you want to update all modules? (y/n): ${NC}"
+        elif [[ "$choice" == "1" || "$choice" =~ ^[Aa]$ ]]; then
+            print_message $YELLOW "Are you sure you want to update all listed modules? (y/n)" true
             read confirm
-            if [ "${confirm,,}" == "y" ]; then
-                for module in "${modules_with_updates[@]}"; do
-                    update_module "$module"
+            if [[ "${confirm,,}" == "y" ]]; then
+                for module_to_update in "${modules_with_updates[@]}"; do
+                    update_module "$module_to_update"
                 done
-                echo -e "${GREEN}All selected modules have been updated successfully. Exiting...${NC}"
-                return
+                echo ""
+                print_message $GREEN "All selected modules have been updated successfully." true
+                return 
             else
-                echo -e "${RED}Update canceled.${NC}"
+                print_message $RED "Update canceled." false
             fi
-        elif [ "$choice" == "2" ]; then
-            while true; do
-                echo -e "${CYAN}Available modules for update:${NC}"
+        elif [[ "$choice" == "2" || "$choice" =~ ^[Ss]$ ]]; then
+            while true;
+            do
+                echo ""
+                print_message $CYAN "--- Specific Module Update ---" true
                 if [ ${#modules_with_updates[@]} -eq 0 ]; then
-                    echo -e "${GREEN}No more modules available to update.${NC}"
-                    return  # Return to main menu
+                    print_message $GREEN "No more modules available to update in this session." true
+                    break # Break from specific module selection, back to A/S/Q
                 fi
+                print_message $YELLOW "Available modules for update:" false
                 for i in "${!modules_with_updates[@]}"; do
-                    echo -e "$((i+1)). $(basename ${modules_with_updates[i]})"
+                    print_message $YELLOW "$((i+1)). $(basename "${modules_with_updates[i]}")" false
                 done
-                echo -e "$(( ${#modules_with_updates[@]} + 1 )). Back"
+                print_message $YELLOW "$(( ${#modules_with_updates[@]} + 1 )). Back to previous menu" false
+                echo ""
+                read -p "$(echo -e "${YELLOW}${BOLD}Enter module number to update or $(( ${#modules_with_updates[@]} + 1 )) to go back: ${NC}")" specific_choice
+                echo ""
 
-                echo -e -n "${YELLOW}Enter module number to update or $(( ${#modules_with_updates[@]} + 1 )) to go back: ${NC}"
-                read specific_choice
+                if ! [[ "$specific_choice" =~ ^[0-9]+$ ]]; then
+                    print_message $RED "Invalid input: '$specific_choice' is not a number." true
+                    continue
+                fi
 
                 if [ "$specific_choice" -eq $(( ${#modules_with_updates[@]} + 1 )) ]; then
-                    # Break out of this specific modules menu
-                    break
+                    break # Break from specific module selection, back to A/S/Q
                 fi
 
                 if [ "$specific_choice" -ge 1 ] && [ "$specific_choice" -le ${#modules_with_updates[@]} ]; then
                     module_index=$((specific_choice-1))
-                    module_path=${modules_with_updates[$module_index]}
-                    echo -e -n "${YELLOW}Are you sure you want to update $(basename $module_path)? (y/n): ${NC}"
+                    module_path_to_update=${modules_with_updates[$module_index]}
+                    print_message $YELLOW "Are you sure you want to update $(basename "$module_path_to_update")? (y/n)" true
                     read confirm
-                    if [ "${confirm,,}" == "y" ]; then
-                        update_module "$module_path"
-                        unset modules_with_updates[$module_index]
+                    if [[ "${confirm,,}" == "y" ]]; then
+                        update_module "$module_path_to_update"
+                        # Remove updated module from list
+                        unset 'modules_with_updates[module_index]'
                         modules_with_updates=("${modules_with_updates[@]}") # Re-index array
+                        print_message $GREEN "$(basename "$module_path_to_update") update process finished." true
                     else
-                        echo -e "${RED}Update canceled for $(basename $module_path).${NC}"
+                        print_message $RED "Update canceled for $(basename "$module_path_to_update")." false
                     fi
                 else
-                    echo -e "${RED}Invalid module number: $specific_choice${NC}"
+                    print_message $RED "Invalid module number: $specific_choice. Please choose from the list." true
                 fi
             done
+        else
+            print_message $RED "Invalid choice. Please enter A, S, Q, or 1-3." true
         fi
     done
 }
@@ -498,33 +604,45 @@ main_menu() {
         handle_menu_choice
 
         # Proceed with selected action
-        if [ "$BUILD_ONLY" = true ]; then
-            ask_for_update_confirmation
-            build_and_install_with_spinner
-        fi
+        # Proceed with selected action only if flags are set
+        if [ "$BUILD_ONLY" = true ] || [ "$RUN_SERVER" = true ]; then
+            if [ "$BUILD_ONLY" = true ]; then
+                ask_for_update_confirmation # This function now also calls ask_for_cores
+                build_and_install_with_spinner
+            fi
 
-        if [ "$RUN_SERVER" = true ]; then
-            # Run authserver and worldserver in tmux session
-            run_tmux_session
-        elif [ "$BUILD_ONLY" = false ]; then
-            print_message $GREEN "Only server run was selected. No build or update occurred." true
+            if [ "$RUN_SERVER" = true ]; then
+                # If only running the server, and no build was done, we still need to ensure paths are set.
+                # ask_for_core_installation_path is called at the start, so paths should be known.
+                run_tmux_session # This function now exits the script.
+            elif [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
+                # This case is for "Rebuild Only" - run temporary authserver
+                run_authserver # This function no longer exits, returns to main_menu loop.
+            fi
+        # This case handles when only module update was chosen and completed.
+        # Or if an invalid main menu choice was entered and returned.
+        # No specific message needed here as update_modules gives feedback.
         fi
-
-        # Run authserver for 60 seconds (Only for option 2)
-        if [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
-            run_authserver
-        fi
-
-        # Reset action flags after execution
+        
+        # Reset action flags after execution for the next loop iteration
         RUN_SERVER=false
         BUILD_ONLY=false
-		
     done
 }
 
 # Function to handle errors
 handle_error() {
-    print_message $RED "$1" true
+    echo "" # Add whitespace before error
+    print_message $RED "--------------------------------------------------------------------" true
+    print_message $RED "ERROR: $1" true
+    if [[ "$1" == *"CMake configuration failed"* || "$1" == *"Build process ('make install') failed"* ]]; then
+        print_message $RED "Suggestion: Check the logs in your build directory ($BUILD_DIR) for more details." true
+    elif [[ "$1" == *"authserver executable not found"* ]];
+        print_message $RED "Suggestion: Ensure AzerothCore was built successfully and the path is correct." true
+    elif [[ "$1" == *"TMUX session"* ]];
+        print_message $RED "Suggestion: Ensure TMUX is installed ('sudo apt install tmux') and functioning correctly." true
+    fi
+    print_message $RED "--------------------------------------------------------------------" true
     exit 1
 }
 
