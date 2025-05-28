@@ -315,14 +315,11 @@ build_and_install_with_spinner() {
 
 # Function to run authserver for 60 seconds with countdown
 run_authserver() {
-    echo ""
-    print_message $BLUE "--- Temporary Authserver Run (Test Build) ---" true
-    print_message $YELLOW "Starting authserver and waiting for it to be ready..." true
-    echo ""
+    print_message "$YELLOW" "Starting authserver for a quick test and waiting for it to be ready..." true
 
     # Check if authserver exists
     if [ ! -f "$AUTH_SERVER_EXEC" ]; then
-        handle_error "Authserver executable not found at $AUTH_SERVER_EXEC. Build might have failed or path is incorrect."
+        handle_error "authserver executable not found at $AUTH_SERVER_EXEC"
     fi
 
     # Run the authserver in the background
@@ -330,33 +327,30 @@ run_authserver() {
     AUTH_SERVER_PID=$!
 
     # Wait for the authserver to be ready by checking if the server is listening on the specified port
-    AUTH_SERVER_PORT=3724 
-    print_message $CYAN "Waiting for authserver to be ready on port $AUTH_SERVER_PORT (max 60 seconds)..." false
-    
-    # Simple spinner
-    for i in {1..60}; do
-        echo -ne "${CYAN}Checking port $AUTH_SERVER_PORT: attempt $i/60 ${SPINNER[$((i % ${#SPINNER[@]}))]} \r${NC}"
-        nc -z localhost $AUTH_SERVER_PORT && break
-        sleep 1
-    done
-    echo -ne "\r${NC}                                                                          \r" # Clear spinner line
+    AUTH_SERVER_PORT=3724  # Replace this with the actual port your authserver uses
+    printf "%b" "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT... "
 
-    if ! nc -z localhost $AUTH_SERVER_PORT; then
-        handle_error "Authserver did not start or become ready on port $AUTH_SERVER_PORT within 60 seconds."
+    # Wait for authserver to start accepting connections (max wait 60 seconds)
+    for i in {1..60}; do
+        nc -z localhost "$AUTH_SERVER_PORT" &>/dev/null && break # Fixed: Silencing nc output
+        sleep 1
+        printf "%b" "." # Simple visual feedback during wait
+    done
+
+    # If we didn't break out of the loop, the server isn't ready
+    if ! nc -z localhost "$AUTH_SERVER_PORT" &>/dev/null; then # Fixed: Silencing nc output in check as well
+        printf "\n" # Newline after dots
+        handle_error "Authserver did not start within the expected time frame."
     fi
 
-    print_message $GREEN "Authserver is ready! It will run for a few seconds then shut down." true
-    sleep 5 
+    printf "%b%s%b\n" "\n${GREEN}Authserver is ready! Waiting 5 seconds before closing..."
+    sleep 5
 
     # Kill the authserver process
-    print_message $YELLOW "Shutting down temporary authserver..." true
     kill "$AUTH_SERVER_PID"
-    wait "$AUTH_SERVER_PID" 2>/dev/null 
+    wait "$AUTH_SERVER_PID" 2>/dev/null  # Wait for the authserver process to properly exit
 
-    echo ""
-    print_message $GREEN "Temporary authserver shutdown complete." true
-    print_message $BLUE "Returning to main menu..." true
-    sleep 2 # Give user time to read message
+    print_message "$GREEN" "Authserver test shutdown complete." true
 }
 
 # Function to run worldserver and authserver in tmux session
@@ -413,7 +407,7 @@ run_tmux_session() {
     clear 
     echo ""
     print_message $CYAN "----------------------------------------------------------------------" true
-    print_message $WHITE "\n  🚀 Congrats, Admin! AzerothCore should now be LIVE in TMUX! 🚀" true
+    print_message $WHITE "\n  Congrats, Admin! AzerothCore should now be LIVE in TMUX!" true
     echo ""
     print_message $YELLOW "  You've just launched a world of adventure (and potential bugs)." true
     print_message $YELLOW "  Remember, with great power comes great responsibility... to check the logs." true
