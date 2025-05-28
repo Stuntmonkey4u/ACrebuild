@@ -21,7 +21,7 @@ This script is designed to help you **update**, **build**, and **run** **Azeroth
    ```bash
    git clone https://github.com/Stuntmonkey4u/ACrebuild.git
    cd ACrebuild
-   chmod +x ACrebuild.sh ACmod.sh
+   chmod +x ACrebuild.sh
 
 2. **Run the script**
 
