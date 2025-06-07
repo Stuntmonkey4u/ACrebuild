@@ -156,17 +156,23 @@ welcome_message() {
 # Function to display the menu
 show_menu() {
     echo ""
-    print_message $BLUE "-------------------- MAIN MENU ---------------------" true
-    print_message $YELLOW "Select an option from the menu below:" true
+    print_message $BLUE "================== MAIN MENU ==================" true
     echo ""
-    print_message $YELLOW "[R] Rebuild and Run Server (1)" false
-    print_message $YELLOW "[B] Rebuild Server Only (2)" false
-    print_message $YELLOW "[S] Run Server Only (3)" false
-    print_message $YELLOW "[M] Update Server Modules (4)" false
-    print_message $YELLOW "[C] Show Current Configuration (5)" false
-    print_message $YELLOW "[Q] Quit Script (6)" false
+    print_message $YELLOW "Select an option:" true
     echo ""
-    print_message $BLUE "----------------------------------------------------" true
+    print_message $CYAN " Server Operations:" true
+    print_message $YELLOW "  [1] Rebuild and Run Server        (Shortcut: R)" false
+    print_message $YELLOW "  [2] Rebuild Server Only           (Shortcut: B)" false
+    print_message $YELLOW "  [3] Run Server Only               (Shortcut: S)" false
+    print_message $YELLOW "  [4] Update Server Modules         (Shortcut: M)" false
+    echo ""
+    print_message $CYAN " Configuration:" true
+    print_message $YELLOW "  [5] Show Current Configuration    (Shortcut: C)" false
+    echo ""
+    print_message $CYAN " Exit:" true
+    print_message $YELLOW "  [6] Quit Script                   (Shortcut: Q)" false
+    echo ""
+    print_message $BLUE "-----------------------------------------------" true
 }
 
 # Function to display current configuration
@@ -495,19 +501,23 @@ update_modules() {
 
     while true; do
         echo ""
-        print_message $CYAN "=== Module Update Options ===" true
+        print_message $BLUE "============ MODULE UPDATE OPTIONS ============" true # Changed heading
+        echo ""
         if [ ${#modules_with_updates[@]} -gt 0 ]; then
             print_message $YELLOW "The following modules have updates available:" true
             for module_path_item in "${modules_with_updates[@]}"; do
-                print_message $YELLOW "  - $(basename "$module_path_item")" false
+                # Using a bullet point for each module
+                print_message $YELLOW "  • $(basename "$module_path_item")" false
             done
         fi
         echo ""
-        print_message $YELLOW "Select an action:" false
-        print_message $YELLOW "[A] Update all listed modules (1)" false
-        print_message $YELLOW "[S] Update specific modules (2)" false
-        print_message $YELLOW "[Q] Quit module update (3)" false
+        print_message $CYAN "Select an action:" true # Changed to CYAN for sub-heading
         echo ""
+        print_message $YELLOW "  [1] Update All Modules           (Shortcut: A)" false
+        print_message $YELLOW "  [2] Update Specific Modules      (Shortcut: S)" false
+        print_message $YELLOW "  [3] Quit Module Update           (Shortcut: Q)" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true # Added footer
         # Separate the prompt color from user input
         read -p "$(echo -e "${YELLOW}${BOLD}Enter choice ([A]ll, [S]pecific, [Q]uit, or 1-3): ${NC}")" choice
         echo ""
@@ -532,18 +542,26 @@ update_modules() {
             while true;
             do
                 echo ""
-                print_message $CYAN "--- Specific Module Update ---" true
+                # Changed heading for specific module update
+                print_message $BLUE "-------- SPECIFIC MODULE UPDATE --------" true
+                echo ""
                 if [ ${#modules_with_updates[@]} -eq 0 ]; then
                     print_message $GREEN "No more modules available to update in this session." true
+                    # Added a footer here as well for consistency before breaking
+                    print_message $BLUE "-----------------------------------------------" true
                     break # Break from specific module selection, back to A/S/Q
                 fi
                 print_message $YELLOW "Available modules for update:" false
                 for i in "${!modules_with_updates[@]}"; do
-                    print_message $YELLOW "$((i+1)). $(basename "${modules_with_updates[i]}")" false
+                    # Formatting as "[i+1] module_name"
+                    print_message $YELLOW "  [$((i+1))] $(basename "${modules_with_updates[i]}")" false
                 done
-                print_message $YELLOW "$(( ${#modules_with_updates[@]} + 1 )). Back to previous menu" false
+                local back_option_number=$(( ${#modules_with_updates[@]} + 1 ))
+                print_message $YELLOW "  [$back_option_number] Back to previous menu" false
                 echo ""
-                read -p "$(echo -e "${YELLOW}${BOLD}Enter module number to update or $(( ${#modules_with_updates[@]} + 1 )) to go back: ${NC}")" specific_choice
+                print_message $BLUE "-----------------------------------------------" true # Added footer
+                # Updated prompt to reflect the dynamic back_option_number
+                read -p "$(echo -e "${YELLOW}${BOLD}Enter module number to update or $back_option_number to go back: ${NC}")" specific_choice
                 echo ""
 
                 if ! [[ "$specific_choice" =~ ^[0-9]+$ ]]; then
@@ -551,7 +569,8 @@ update_modules() {
                     continue
                 fi
 
-                if [ "$specific_choice" -eq $(( ${#modules_with_updates[@]} + 1 )) ]; then
+                # Using the dynamic back_option_number for comparison
+                if [ "$specific_choice" -eq "$back_option_number" ]; then
                     break # Break from specific module selection, back to A/S/Q
                 fi
 
@@ -566,6 +585,12 @@ update_modules() {
                         unset 'modules_with_updates[module_index]'
                         modules_with_updates=("${modules_with_updates[@]}") # Re-index array
                         print_message $GREEN "$(basename "$module_path_to_update") update process finished." true
+
+                        # Check if all modules have been updated
+                        if [ ${#modules_with_updates[@]} -eq 0 ]; then
+                            print_message $GREEN "All available module updates completed. Returning to main menu..." true
+                            return # Return from update_modules to the main menu loop
+                        fi
                     else
                         print_message $RED "Update canceled for $(basename "$module_path_to_update")." false
                     fi
