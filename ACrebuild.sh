@@ -820,7 +820,7 @@ create_backup() {
             save_config_value "DB_USER" "$DB_USER"
         fi
     fi
-    
+
     # Handle DB Password
     # If DB_PASS is empty after loading config, always prompt.
     if [ -z "$DB_PASS" ]; then
@@ -1139,8 +1139,42 @@ handle_menu_choice() {
 }
 
 # Function to ask for confirmation before updating or building
+# Returns 0 to proceed with build, 1 to abort.
 ask_for_update_confirmation() {
-    echo ""
+    print_message $BLUE "--- Build Preparation ---" true
+
+    # Check if servers are running using port checks
+    local auth_port_active=false
+    local world_port_active=false
+    if nc -z localhost 3724 &>/dev/null; then auth_port_active=true; fi
+    if nc -z localhost 8085 &>/dev/null; then world_port_active=true; fi
+
+    if [ "$auth_port_active" = true ] || [ "$world_port_active" = true ]; then
+        print_message $YELLOW "Servers appear to be running (ports 3724 and/or 8085 are active)." true
+        print_message $YELLOW "It is strongly recommended to stop them before rebuilding." true
+        print_message $YELLOW "Would you like to attempt to stop the servers now? (y/n)" true
+        read -r stop_choice
+        if [[ "$stop_choice" =~ ^[Yy]$ ]]; then
+            stop_servers
+            local stop_result=$?
+            # Re-check ports after attempting stop
+            if nc -z localhost 3724 &>/dev/null || nc -z localhost 8085 &>/dev/null; then
+                 # Even if stop_servers thought it succeeded, if ports are still active, it's a problem.
+                print_message $RED "Failed to stop servers (ports still active) or stop command failed (status: $stop_result)." true
+                print_message $RED "Rebuild aborted to prevent issues. Please stop servers manually." true
+                return 1 # Abort build
+            else
+                print_message $GREEN "Servers stopped successfully." true
+            fi
+        else
+            print_message $RED "User chose not to stop servers. Rebuild aborted." true
+            return 1 # Abort build
+        fi
+    else
+        print_message $GREEN "Servers appear to be stopped (ports 3724 and 8085 are not active)." false
+    fi
+
+    echo "" # Add a space before the next question
     while true; do
         print_message $YELLOW "Would you like to update the AzerothCore source code before rebuilding? (y/n)" true
         read -r confirmation
@@ -1159,6 +1193,7 @@ ask_for_update_confirmation() {
 
     # Ask the user how many cores to use for building, after update or skipping
     ask_for_cores
+    return 0 # Proceed with build
 }
 
 # Function to ask the user how many cores they want to use for the build
@@ -1538,6 +1573,7 @@ check_server_status() {
     local world_port_listening=false
     local world_status_msg=""
     local world_status_color=$YELLOW
+    local world_pid_is_shared_with_auth=false # New flag
 
     # --- Authserver Check ---
     auth_pid=$(tmux list-panes -t "$auth_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
@@ -1583,7 +1619,12 @@ check_server_status() {
 
     # --- Worldserver Check ---
     world_pid=$(tmux list-panes -t "$world_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
-    if [ -n "$world_pid" ]; then
+
+    if [ -n "$world_pid" ] && [ "$world_pid" == "$auth_pid" ]; then
+        world_pid_is_shared_with_auth=true
+    fi
+
+    if [ -n "$world_pid" ] && [ "$world_pid_is_shared_with_auth" = false ]; then
         # Primary process check
         if ps -p "$world_pid" -o args= | grep -Eq "(^|/)worldserver(\s|$|--)"; then
             world_direct_match_found=true
@@ -1597,7 +1638,7 @@ check_server_status() {
         if $world_direct_match_found || $world_child_match_found; then
             world_process_likely_running=true
         fi
-    fi
+    fi # End of process check block for non-shared PID
 
     # Worldserver Port Check
     if nc -z localhost 8085 &>/dev/null; then
@@ -1605,21 +1646,32 @@ check_server_status() {
     fi
 
     # Construct Worldserver Status Message
-    if $world_port_listening && $world_process_likely_running; then
-        world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port 8085: Listening"
-        world_status_color=$GREEN
-    elif $world_port_listening && ! $world_process_likely_running; then
-        world_status_msg="Worldserver: Port 8085 Listening (Process name check inconclusive for pane PID $world_pid)"
-        world_status_color=$YELLOW
-    elif ! $world_port_listening && $world_process_likely_running; then
-        world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port 8085: Not Listening"
-        world_status_color=$YELLOW
-    elif [ -n "$world_pid" ]; then # Pane PID exists but process/port non-responsive
-        world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid), but process/port non-responsive."
-        world_status_color=$RED
-    else # Pane PID does not exist
-        world_status_msg="Worldserver: Stopped (Pane $world_server_pane not found or no PID)"
-        world_status_color=$YELLOW
+    if $world_port_listening; then
+        if $world_process_likely_running; then # Implies PIDs were different and name check passed
+            world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port 8085: Listening"
+            world_status_color=$GREEN
+        elif $world_pid_is_shared_with_auth; then
+             world_status_msg="Worldserver: Port 8085 Listening (Process name check complex due to shared pane PID with Authserver: $world_pid)"
+             world_status_color=$GREEN # Port is the strong indicator here
+        else # Port listening, but process name check failed (and PID not shared or was different and still failed)
+            world_status_msg="Worldserver: Port 8085 Listening (Process name check inconclusive for pane PID $world_pid)"
+            world_status_color=$YELLOW
+        fi
+    else # Port not listening
+        if $world_process_likely_running; then # Implies PIDs were different and name check passed
+            world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port 8085: Not Listening"
+            world_status_color=$YELLOW
+        elif [ -n "$world_pid" ]; then # Pane PID exists but port not listening and process name not confirmed (or shared PID)
+            if $world_pid_is_shared_with_auth; then
+                 world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid, shared with Authserver), Port 8085: Not Listening."
+            else
+                 world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid), but Worldserver process/port non-responsive."
+            fi
+            world_status_color=$RED
+        else # Pane PID does not exist for worldserver
+            world_status_msg="Worldserver: Stopped (Pane $world_server_pane not found or no PID)"
+            world_status_color=$YELLOW
+        fi
     fi
     print_message "$world_status_color" "$world_status_msg" false
 
@@ -1860,12 +1912,23 @@ main_menu() {
         # Proceed with selected action
         # Proceed with selected action only if flags are set
         if [ "$BUILD_ONLY" = true ] || [ "$RUN_SERVER" = true ]; then
+            local can_proceed_with_build=true
             if [ "$BUILD_ONLY" = true ]; then
                 ask_for_update_confirmation # This function now also calls ask_for_cores
-                build_and_install_with_spinner
+                local build_prep_status=$?
+                if [ $build_prep_status -ne 0 ]; then
+                    can_proceed_with_build=false # Abort build
+                    # Reset flags as build is aborted
+                    BUILD_ONLY=false
+                    RUN_SERVER=false
+                fi
+
+                if [ "$can_proceed_with_build" = true ]; then
+                    build_and_install_with_spinner
+                fi
             fi
 
-            if [ "$RUN_SERVER" = true ]; then
+            if [ "$RUN_SERVER" = true ] && [ "$can_proceed_with_build" = true ]; then
                 # If only running the server, and no build was done, we still need to ensure paths are set.
                 # ask_for_core_installation_path is called at the start, so paths should be known.
                 run_tmux_session # This function now exits the script.
