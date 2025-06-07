@@ -151,9 +151,9 @@ check_for_script_updates() {
         # Use the existing print_message function to display the notification.
         # $YELLOW is a predefined color variable in the script.
         # The third argument 'false' means the message text will not be bold.
-        echo
+        echo ""
         print_message "$YELLOW" "An update is available to ACrebuild" false
-        echo
+        echo ""
     fi
 }
 
@@ -369,6 +369,7 @@ EOF
 
 # Function to check if essential dependencies are installed
 check_dependencies() {
+    echo""
     print_message $BLUE "Checking for essential dependencies..." true
     MISSING_DEPENDENCIES=() # Initialize the array here
 
@@ -870,6 +871,7 @@ self_update_script() {
     fi
 
     # Ask for Confirmation
+    echo ""
     print_message $YELLOW "Do you want to pull the latest changes? (y/n)" true
     read -r updateConfirm
     if [[ ! "$updateConfirm" =~ ^[Yy]$ ]]; then
