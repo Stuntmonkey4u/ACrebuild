@@ -440,18 +440,18 @@ show_menu() {
     echo ""
     print_message $CYAN " Server Operations:" true
     print_message $YELLOW "  [1] Rebuild and Run Server        (Shortcut: R)" false
-    print_message $YELLOW "  [2] Rebuild Server Only           (Shortcut: U)" false # Changed B to U
-    print_message $YELLOW "  [3] Run Server Only               (Shortcut: S)" false
-    print_message $YELLOW "  [4] Update Server Modules         (Shortcut: M)" false
+    print_message $YELLOW "  [2] Rebuild Server Only           (Shortcut: U)" false
+    # [3] Run Server Only (Shortcut: S) has been removed
+    print_message $YELLOW "  [3] Update Server Modules         (Shortcut: M)" false # Was [4]
     echo ""
-    print_message $CYAN " Server Management & Configuration:" true # Combined section header
-    print_message $YELLOW "  [5] Process Management            (Shortcut: P)" false
-    print_message $YELLOW "  [6] Backup/Restore Options      (Shortcut: B)" false
-    print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
-    print_message $YELLOW "  [8] Configuration Options         (Shortcut: C)" false
+    print_message $CYAN " Server Management & Configuration:" true
+    print_message $YELLOW "  [4] Process Management            (Shortcut: P)" false # Was [5]
+    print_message $YELLOW "  [5] Backup/Restore Options        (Shortcut: B)" false # Was [6]
+    print_message $YELLOW "  [6] Log Viewer                    (Shortcut: L)" false # Was [7]
+    print_message $YELLOW "  [7] Configuration Options         (Shortcut: C)" false # Was [8]
     echo ""
     print_message $CYAN " Exit:" true
-    print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false
+    print_message $YELLOW "  [8] Quit Script                   (Shortcut: Q)" false # Was [9]
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -762,13 +762,13 @@ view_script_log() {
 
 view_auth_log() {
     print_message $CYAN "Accessing auth server log..." false
-    local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILE"
+    local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILENAME"
     view_log_file "$full_auth_log_path" true # true means prompt for view mode
 }
 
 view_world_log() {
     print_message $CYAN "Accessing world server log..." false
-    local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILE"
+    local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
     view_log_file "$full_world_log_path" true # true means prompt for view mode
 }
 
@@ -1083,7 +1083,7 @@ restore_backup() {
 # Function to handle user input for the menu
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, S, M, P, B, L, C, Q, or 1-9]: ${NC}")" choice # Updated range to 1-9
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, Q, or 1-8]: ${NC}")" choice # Removed S, updated range to 1-8
     case $choice in
         1|[Rr]) # Rebuild and Run
             RUN_SERVER=true
@@ -1093,49 +1093,46 @@ handle_menu_choice() {
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        3|[Ss]) # Run Server Only
-            RUN_SERVER=true
-            BUILD_ONLY=false
-            ;;
-        4|[Mm]) # Update Server Modules
+        # Case for 3 | [Ss] (Run Server Only) is removed
+        3|[Mm]) # Update Server Modules (was 4)
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        5|[Pp]) # Process Management
+        4|[Pp]) # Process Management (was 5)
             show_process_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        6|[Bb]) # Backup/Restore Options
+        5|[Bb]) # Backup/Restore Options (was 6)
             show_backup_restore_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        7|[Ll]) # Log Viewer
+        6|[Ll]) # Log Viewer (was 7)
             show_log_viewer_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        8|[Cc]) # Configuration Options
+        7|[Cc]) # Configuration Options (was 8)
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        9|[Qq]) # Quit Script
+        8|[Qq]) # Quit Script (was 9)
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0
             ;;
         *)
             echo ""
-            print_message $RED "Invalid choice. Please select a valid option from the menu." false # Generic error
+            print_message $RED "Invalid choice. Please select a valid option from the menu." false
             return
             ;;
     esac
@@ -1525,67 +1522,109 @@ check_server_status() {
 
     local auth_server_pane="$TMUX_SESSION_NAME:0.0"
     local world_server_pane="$TMUX_SESSION_NAME:0.1"
-    local auth_pid=""
-    local world_pid=""
-    local auth_process_status="Process Not Found"
-    local world_process_status="Process Not Found"
-    local auth_port_status="Port Not Checked"
-    local world_port_status="Port Not Checked"
-    local auth_final_status_color=$YELLOW # Default to yellow
-    local world_final_status_color=$YELLOW # Default to yellow
 
-    # Check Authserver Process
+    local auth_pid=""
+    local auth_direct_match_found=false
+    local auth_child_match_found=false
+    local auth_process_likely_running=false
+    local auth_port_listening=false
+    local auth_status_msg=""
+    local auth_status_color=$YELLOW
+
+    local world_pid=""
+    local world_direct_match_found=false
+    local world_child_match_found=false
+    local world_process_likely_running=false
+    local world_port_listening=false
+    local world_status_msg=""
+    local world_status_color=$YELLOW
+
+    # --- Authserver Check ---
     auth_pid=$(tmux list-panes -t "$auth_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
     if [ -n "$auth_pid" ]; then
+        # Primary process check
         if ps -p "$auth_pid" -o args= | grep -Eq "(^|/)authserver(\s|$|--)"; then
-            auth_process_status="Running (PID: $auth_pid)"
-        else
-            auth_process_status="PID $auth_pid found, but not 'authserver' (or exited)."
+            auth_direct_match_found=true
         fi
-    else
-        auth_process_status="Pane $auth_server_pane not found or no PID."
+        # Child process check (if direct match failed)
+        if ! $auth_direct_match_found; then
+            if ps -o args= -H --ppid "$auth_pid" | grep -Eq "(^|/)authserver(\s|$|--)"; then
+                auth_child_match_found=true
+            fi
+        fi
+        if $auth_direct_match_found || $auth_child_match_found; then
+            auth_process_likely_running=true
+        fi
     fi
 
-    # Check Authserver Port (Port 3724)
-    if nc -z localhost 3724; then
-        auth_port_status="Listening"
-    else
-        auth_port_status="Not Listening"
+    # Authserver Port Check
+    if nc -z localhost 3724 &>/dev/null; then
+        auth_port_listening=true
     fi
 
-    # Determine Authserver final status and color
-    if [[ "$auth_process_status" == "Running"* ]] && [ "$auth_port_status" == "Listening" ]; then
-        auth_final_status_color=$GREEN
+    # Construct Authserver Status Message
+    if $auth_port_listening && $auth_process_likely_running; then
+        auth_status_msg="Authserver: Running (PID: $auth_pid, Process Name OK), Port 3724: Listening"
+        auth_status_color=$GREEN
+    elif $auth_port_listening && ! $auth_process_likely_running; then
+        auth_status_msg="Authserver: Port 3724 Listening (Process name check inconclusive for pane PID $auth_pid)"
+        auth_status_color=$YELLOW
+    elif ! $auth_port_listening && $auth_process_likely_running; then
+        auth_status_msg="Authserver: Process Found (PID: $auth_pid, Name OK), Port 3724: Not Listening"
+        auth_status_color=$YELLOW
+    elif [ -n "$auth_pid" ]; then # Pane PID exists but process/port non-responsive
+        auth_status_msg="Authserver: Pane $auth_server_pane active (PID: $auth_pid), but process/port non-responsive."
+        auth_status_color=$RED
+    else # Pane PID does not exist
+        auth_status_msg="Authserver: Stopped (Pane $auth_server_pane not found or no PID)"
+        auth_status_color=$YELLOW
     fi
-    print_message $auth_final_status_color "Authserver: $auth_process_status, Port 3724: $auth_port_status" false
+    print_message "$auth_status_color" "$auth_status_msg" false
 
-    # Check Worldserver Process
+    # --- Worldserver Check ---
     world_pid=$(tmux list-panes -t "$world_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
     if [ -n "$world_pid" ]; then
+        # Primary process check
         if ps -p "$world_pid" -o args= | grep -Eq "(^|/)worldserver(\s|$|--)"; then
-            world_process_status="Running (PID: $world_pid)"
-        else
-            world_process_status="PID $world_pid found, but not 'worldserver' (or exited)."
+            world_direct_match_found=true
         fi
-    else
-        world_process_status="Pane $world_server_pane not found or no PID."
+        # Child process check
+        if ! $world_direct_match_found; then
+            if ps -o args= -H --ppid "$world_pid" | grep -Eq "(^|/)worldserver(\s|$|--)"; then
+                world_child_match_found=true
+            fi
+        fi
+        if $world_direct_match_found || $world_child_match_found; then
+            world_process_likely_running=true
+        fi
     fi
 
-    # Check Worldserver Port (Port 8085)
-    if nc -z localhost 8085; then
-        world_port_status="Listening"
-    else
-        world_port_status="Not Listening"
+    # Worldserver Port Check
+    if nc -z localhost 8085 &>/dev/null; then
+        world_port_listening=true
     fi
 
-    # Determine Worldserver final status and color
-    if [[ "$world_process_status" == "Running"* ]] && [ "$world_port_status" == "Listening" ]; then
-        world_final_status_color=$GREEN
+    # Construct Worldserver Status Message
+    if $world_port_listening && $world_process_likely_running; then
+        world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port 8085: Listening"
+        world_status_color=$GREEN
+    elif $world_port_listening && ! $world_process_likely_running; then
+        world_status_msg="Worldserver: Port 8085 Listening (Process name check inconclusive for pane PID $world_pid)"
+        world_status_color=$YELLOW
+    elif ! $world_port_listening && $world_process_likely_running; then
+        world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port 8085: Not Listening"
+        world_status_color=$YELLOW
+    elif [ -n "$world_pid" ]; then # Pane PID exists but process/port non-responsive
+        world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid), but process/port non-responsive."
+        world_status_color=$RED
+    else # Pane PID does not exist
+        world_status_msg="Worldserver: Stopped (Pane $world_server_pane not found or no PID)"
+        world_status_color=$YELLOW
     fi
-    print_message $world_final_status_color "Worldserver: $world_process_status, Port 8085: $world_port_status" false
+    print_message "$world_status_color" "$world_status_msg" false
 
     echo ""
-    print_message $CYAN "Note: Status is based on TMUX pane PIDs, process arguments, and port checks." false
+    print_message $CYAN "Note: Status is based on TMUX pane PIDs, process arguments (direct & child), and port checks." false
     print_message $CYAN "For definitive status, attach to TMUX: tmux attach -t $TMUX_SESSION_NAME" false
     return 0
 }
