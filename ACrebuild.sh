@@ -151,7 +151,9 @@ check_for_script_updates() {
         # Use the existing print_message function to display the notification.
         # $YELLOW is a predefined color variable in the script.
         # The third argument 'false' means the message text will not be bold.
+        echo
         print_message "$YELLOW" "An update is available to ACrebuild" false
+        echo
     fi
 }
 
