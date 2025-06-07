@@ -52,12 +52,12 @@ CHAR_DB_NAME=""
 WORLD_DB_NAME=""
 SERVER_CONFIG_DIR_PATH=""
 SERVER_LOG_DIR_PATH=""
-AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path
-WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path
-SCRIPT_LOG_DIR_CONF="" # To store SCRIPT_LOG_DIR from config, to avoid conflict with global SCRIPT_LOG_DIR used by print_message before config loads.
-SCRIPT_LOG_FILENAME_CONF="" # To store SCRIPT_LOG_FILENAME from config
-SCRIPT_LOG_FILE="" # Actual path to script log file, derived after config load
-CORES="" # Will be CORES_FOR_BUILD from config
+AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
+WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
+# SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
+# SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
+SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
+CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
 
 
 # Function to print the message with a specific color and optional bold text
@@ -1080,52 +1080,55 @@ restore_backup() {
     echo ""
 }
 
-# Function to handle user input for the menu
+# Function to handle user input for the main menu.
+# It maps both numeric choices and letter shortcuts to actions or sub-menus.
+# For actions that don't lead to a build/run cycle (e.g., showing a sub-menu),
+# it resets BUILD_ONLY and RUN_SERVER flags and returns to the main menu loop.
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, Q, or 1-8]: ${NC}")" choice # Removed S, updated range to 1-8
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, Q, or 1-8]: ${NC}")" choice # Prompt reflects available options
     case $choice in
-        1|[Rr]) # Rebuild and Run
+        1|[Rr]) # [1] Rebuild and Run Server
             RUN_SERVER=true
             BUILD_ONLY=true
             ;;
-        2|[Uu]) # bUild Server Only
+        2|[Uu]) # [2] Rebuild Server Only
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        # Case for 3 | [Ss] (Run Server Only) is removed
-        3|[Mm]) # Update Server Modules (was 4)
+        # Option [3] (Run Server Only) was removed.
+        3|[Mm]) # [3] Update Server Modules
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        4|[Pp]) # Process Management (was 5)
+        4|[Pp]) # [4] Process Management
             show_process_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        5|[Bb]) # Backup/Restore Options (was 6)
+        5|[Bb]) # [5] Backup/Restore Options
             show_backup_restore_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        6|[Ll]) # Log Viewer (was 7)
+        6|[Ll]) # [6] Log Viewer
             show_log_viewer_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        7|[Cc]) # Configuration Options (was 8)
+        7|[Cc]) # [7] Configuration Options
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        8|[Qq]) # Quit Script (was 9)
+        8|[Qq]) # [8] Quit Script
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0
@@ -1138,42 +1141,58 @@ handle_menu_choice() {
     esac
 }
 
-# Function to ask for confirmation before updating or building
-# Returns 0 to proceed with build, 1 to abort.
+# Function to ask for confirmation before updating or building.
+# This function performs several pre-build checks:
+# 1. Checks if Authserver (port 3724) or Worldserver (port 8085) seem to be running using 'nc'.
+# 2. If servers appear active, it prompts the user to stop them.
+# 3. If user agrees to stop:
+#    a. Calls `stop_servers()`.
+#    b. Re-checks ports to confirm successful shutdown. If still active, aborts build.
+# 4. If user declines to stop active servers, aborts build.
+# 5. If servers are stopped (or were not running), proceeds to ask about updating source code.
+# 6. Finally, calls `ask_for_cores()`.
+# Returns 0 if all checks pass and user confirms, allowing the build to proceed.
+# Returns 1 if any check fails or user aborts, signaling to cancel the build.
 ask_for_update_confirmation() {
     print_message $BLUE "--- Build Preparation ---" true
 
-    # Check if servers are running using port checks
+    # Step 1: Check if servers are running using port checks
     local auth_port_active=false
     local world_port_active=false
     if nc -z localhost 3724 &>/dev/null; then auth_port_active=true; fi
     if nc -z localhost 8085 &>/dev/null; then world_port_active=true; fi
 
+    # Step 2 & 3: If servers active, prompt to stop
     if [ "$auth_port_active" = true ] || [ "$world_port_active" = true ]; then
         print_message $YELLOW "Servers appear to be running (ports 3724 and/or 8085 are active)." true
         print_message $YELLOW "It is strongly recommended to stop them before rebuilding." true
         print_message $YELLOW "Would you like to attempt to stop the servers now? (y/n)" true
         read -r stop_choice
         if [[ "$stop_choice" =~ ^[Yy]$ ]]; then
+            # Step 3a: Call stop_servers()
             stop_servers
-            local stop_result=$?
-            # Re-check ports after attempting stop
+            local stop_result=$? # Capture return status of stop_servers (though currently it always returns 0)
+
+            # Step 3b: Re-check ports to confirm successful shutdown
             if nc -z localhost 3724 &>/dev/null || nc -z localhost 8085 &>/dev/null; then
-                 # Even if stop_servers thought it succeeded, if ports are still active, it's a problem.
-                print_message $RED "Failed to stop servers (ports still active) or stop command failed (status: $stop_result)." true
-                print_message $RED "Rebuild aborted to prevent issues. Please stop servers manually." true
+                # This condition means either stop_servers() didn't effectively stop them, or they restarted quickly.
+                print_message $RED "Failed to stop servers (ports still active after stop attempt; stop_servers status: $stop_result)." true
+                print_message $RED "Rebuild aborted to prevent issues. Please stop servers manually via Process Management." true
                 return 1 # Abort build
             else
                 print_message $GREEN "Servers stopped successfully." true
             fi
         else
+            # Step 4: User chose not to stop servers
             print_message $RED "User chose not to stop servers. Rebuild aborted." true
             return 1 # Abort build
         fi
     else
+        # Servers were not detected as running by port check
         print_message $GREEN "Servers appear to be stopped (ports 3724 and 8085 are not active)." false
     fi
 
+    # Step 5: Ask about updating source code
     echo "" # Add a space before the next question
     while true; do
         print_message $YELLOW "Would you like to update the AzerothCore source code before rebuilding? (y/n)" true
@@ -1317,8 +1336,14 @@ run_authserver() {
     print_message "$GREEN" "Authserver test shutdown complete." true
 }
 
-# Function to start servers in TMUX (called by process manager or run_tmux_session)
-# This function should NOT exit the script.
+# Function to start servers in TMUX.
+# Creates a new TMUX session if one doesn't exist, with a specific split-pane layout:
+# - Window 0, Pane 0 (left/top, $TMUX_SESSION_NAME:0.0): Authserver, titled with $AUTHSERVER_PANE_TITLE.
+# - Window 0, Pane 1 (right/bottom, $TMUX_SESSION_NAME:0.1): Worldserver, titled with $WORLDSERVER_PANE_TITLE.
+# If a session exists and appears to be correctly configured (2 panes in window 0), it informs the user.
+# If session exists but misconfigured, it advises manual intervention.
+# This function should NOT exit the script itself.
+# Returns 0 on successful start command issuance, 1 on failure to start, 2 if servers might already be running.
 start_servers() {
     print_message $BLUE "--- Attempting to Start AzerothCore Servers ---" true
 
@@ -1328,10 +1353,10 @@ start_servers() {
         return 1
     fi
 
-    # Paths to executables
+    # Paths to executables, ensure they exist
     local auth_exec_path="$AZEROTHCORE_DIR/env/dist/bin/authserver"
     local world_exec_path="$AZEROTHCORE_DIR/env/dist/bin/worldserver"
-    local server_bin_dir="$AZEROTHCORE_DIR/env/dist/bin"
+    local server_bin_dir="$AZEROTHCORE_DIR/env/dist/bin" # Base directory for cd
 
     if [ ! -f "$auth_exec_path" ]; then
         print_message $RED "Authserver executable not found at $auth_exec_path" true
@@ -1346,39 +1371,39 @@ start_servers() {
     if tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
         print_message $YELLOW "TMUX session '$TMUX_SESSION_NAME' already exists." false
 
-        local auth_pane_exists
-        # Check if window 0 exists and has two panes.
-        # This is a simplified check. A more robust check would verify pane titles or processes.
+        # Check if window 0 exists and has two panes (our expected layout).
         local pane_count
-        pane_count=$(tmux list-panes -t "$TMUX_SESSION_NAME:0" 2>/dev/null | wc -l)
+        pane_count=$(tmux list-panes -t "$TMUX_SESSION_NAME:0" 2>/dev/null | wc -l) # Target window 0 specifically
 
         if [ "$pane_count" -eq 2 ]; then
+            # Further checks could verify titles or processes, but for now, 2 panes is a good sign.
             print_message $GREEN "TMUX session '$TMUX_SESSION_NAME' appears to have a split-pane setup in window 0." false
             print_message $YELLOW "Servers might be running. Use 'Check Server Status' or 'Stop/Restart'." false
             return 2 # Indicate servers might be running / session active
         else
-            # Session exists, but not in the expected split-pane state.
-            print_message $RED "Session '$TMUX_SESSION_NAME' exists but is not in the expected 2-pane configuration." true
-            print_message $YELLOW "Please use 'Stop Servers' (which might kill the session) and then 'Start Servers' again." true
-            return 1
+            # Session exists, but not in the expected split-pane state (e.g., wrong number of panes in window 0).
+            print_message $RED "Session '$TMUX_SESSION_NAME' exists but is not in the expected 2-pane configuration for window 0." true
+            print_message $YELLOW "Please use 'Stop Servers' (which might kill the session) and then 'Start Servers' again for a clean setup." true
+            return 1 # Indicate misconfiguration
         fi
     else
+        # Create new session if it doesn't exist
         print_message $CYAN "Creating new TMUX session '$TMUX_SESSION_NAME' with split-pane layout..." false
-        # Create session with the first pane (0.0) for Authserver
+        # Create session detached, it will have one window (0) and one pane (0.0) by default.
         tmux new-session -s "$TMUX_SESSION_NAME" -d
         if [ $? -ne 0 ]; then
             print_message $RED "Failed to create new TMUX session." true
             return 1
         fi
-        sleep 1 # Give TMUX a moment
+        sleep 1 # Give TMUX a moment to initialize
 
-        # Optionally rename the first pane (which is in window 0, pane 0)
+        # Set title for the first pane (Authserver)
         tmux select-pane -t "$TMUX_SESSION_NAME:0.0" -T "$AUTHSERVER_PANE_TITLE"
 
         print_message $CYAN "Starting Authserver in the first pane ($TMUX_SESSION_NAME:0.0)..." false
         tmux send-keys -t "$TMUX_SESSION_NAME:0.0" "cd '$server_bin_dir' && '$auth_exec_path'" C-m
 
-        # Wait for the authserver to be ready
+        # Wait for Authserver to be ready by checking its port
         AUTH_SERVER_PORT=3724
         print_message $CYAN "Waiting for authserver to be ready on port $AUTH_SERVER_PORT (max 60 seconds)..." false
         SPINNER=('\' '|' '/' '-')
@@ -1392,22 +1417,22 @@ start_servers() {
         if ! nc -z localhost $AUTH_SERVER_PORT; then
             print_message $RED "Authserver did not start or become ready on port $AUTH_SERVER_PORT within 60 seconds." true
             print_message $RED "Check TMUX session '$TMUX_SESSION_NAME' (pane '$AUTHSERVER_PANE_TITLE') for errors." true
-            tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Clean up session
+            tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Clean up the partially started session
             return 1
         fi
         print_message $GREEN "Authserver appears to be ready." true
 
-        # Split the window horizontally for Worldserver
+        # Split the current window (window 0, pane 0.0) horizontally to create pane 0.1 for Worldserver
         print_message $CYAN "Splitting window and starting Worldserver in the second pane..." false
-        tmux split-window -h -t "$TMUX_SESSION_NAME:0.0" # Splits current pane (0.0), new pane becomes 0.1
+        tmux split-window -h -t "$TMUX_SESSION_NAME:0.0"
         if [ $? -ne 0 ]; then
             print_message $RED "Failed to split TMUX window." true
-            tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Clean up session
+            tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Clean up
             return 1
         fi
-        sleep 1 # Give TMUX a moment to create the pane
+        sleep 1 # Give TMUX a moment
 
-        # Optionally rename the new pane (0.1)
+        # Set title for the new pane (Worldserver, now pane 0.1)
         tmux select-pane -t "$TMUX_SESSION_NAME:0.1" -T "$WORLDSERVER_PANE_TITLE"
 
         print_message $CYAN "Starting Worldserver in the second pane ($TMUX_SESSION_NAME:0.1)..." false
@@ -1415,30 +1440,35 @@ start_servers() {
 
         print_message $GREEN "Servers started in a split-pane layout in TMUX session '$TMUX_SESSION_NAME'." false
     fi
-    
+
+    # Common success messages
     echo ""
     print_message $CYAN "----------------------------------------------------------------------" true
     print_message $WHITE "\n  AzerothCore servers should now be starting/running in TMUX session '$TMUX_SESSION_NAME'." true
-    print_message $YELLOW "  Authserver runs in the left pane, Worldserver in the right pane of the first window." false
+    print_message $YELLOW "  Authserver runs in the left pane ($AUTHSERVER_PANE_TITLE), Worldserver in the right pane ($WORLDSERVER_PANE_TITLE) of the first window." false
     echo ""
     print_message $CYAN "  To manage your server and view console output:" true
     print_message $WHITE "    ${BOLD}tmux attach -t $TMUX_SESSION_NAME${NC}" true
     echo ""
     print_message $CYAN "  Inside TMUX: Ctrl+B, then D to detach. Ctrl+B, <arrow_key> to switch panes." true
     print_message $CYAN "----------------------------------------------------------------------" true
-    echo "" 
+    echo ""
     return 0 # Success
 }
 
-# Function to stop servers
+# Function to stop servers running in the TMUX split-pane layout
+# Attempts graceful shutdown for Worldserver, then kills panes.
+# Kills session if it becomes empty.
 stop_servers() {
     print_message $BLUE "--- Attempting to Stop AzerothCore Servers ---" true
 
+    # Check if TMUX is installed
     if ! command -v tmux &> /dev/null; then
         print_message $RED "TMUX is not installed. Cannot manage servers." true
         return 1
     fi
 
+    # Check if the TMUX session exists
     if ! tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
         print_message $YELLOW "TMUX session '$TMUX_SESSION_NAME' not found. Servers are likely not running." false
         return 0 # Not an error, just nothing to do
@@ -1446,15 +1476,17 @@ stop_servers() {
 
     print_message $CYAN "TMUX session '$TMUX_SESSION_NAME' found." false
 
-    # Define pane targets (assuming they are always 0.0 for auth and 0.1 for world in window 0)
-    local auth_target_pane="$TMUX_SESSION_NAME:0.0"
-    local world_target_pane="$TMUX_SESSION_NAME:0.1"
+    # Define pane targets based on the split-pane layout (window 0, panes 0.0 and 0.1)
+    local auth_target_pane="$TMUX_SESSION_NAME:0.0" # Authserver in left/top pane
+    local world_target_pane="$TMUX_SESSION_NAME:0.1" # Worldserver in right/bottom pane
     local world_pane_exists=false
     local auth_pane_exists=false
 
-    # Check if worldserver pane (0.1) exists by trying to select it and checking its title (if set) or just existence
-    # A more direct way: list panes and check indices or titles if set reliably.
-    if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index} #{pane_title}" | grep -q -E "^1($|\s.*$WORLDSERVER_PANE_TITLE)"; then
+    # Check if worldserver pane (0.1) exists.
+    # We check by index as titles can be unreliable if manually changed by user.
+    # `tmux list-panes -t "$TMUX_SESSION_NAME:0"` lists panes in window 0.
+    # Grep for `^1:` (pane index 1) or use more specific format if titles are set with select-pane -T
+    if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^1$"; then # Check if pane 0.1 exists
         world_pane_exists=true
     fi
 
@@ -1462,46 +1494,44 @@ stop_servers() {
         print_message $YELLOW "Sending graceful shutdown command ('$WORLDSERVER_CONSOLE_COMMAND_STOP') to Worldserver pane ($world_target_pane)..." false
         tmux send-keys -t "$world_target_pane" "$WORLDSERVER_CONSOLE_COMMAND_STOP" C-m
         print_message $CYAN "Waiting a few seconds for Worldserver to process shutdown..." false
-        sleep 10
-        # Check if pane is still alive;
-        if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^1"; then # Check if pane 1 still exists
-             print_message $YELLOW "Worldserver pane ($world_target_pane) still exists. It might be shutting down." false
-             print_message $CYAN "Killing Worldserver pane ($world_target_pane)..." false
-             tmux kill-pane -t "$world_target_pane" 2>/dev/null || print_message $RED "Failed to kill Worldserver pane. It might have already closed." false
+        sleep 10 # Give time for graceful shutdown to initiate
+
+        # Re-check if pane 0.1 still exists after graceful shutdown attempt
+        if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^1$"; then
+             print_message $YELLOW "Worldserver pane ($world_target_pane) still exists. Forcing closure." false
+             tmux kill-pane -t "$world_target_pane" 2>/dev/null || print_message $RED "Failed to kill Worldserver pane $world_target_pane." false
         else
-            print_message $GREEN "Worldserver pane ($world_target_pane) closed." false
+            print_message $GREEN "Worldserver pane ($world_target_pane) closed (likely from graceful shutdown)." false
         fi
     else
-        print_message $YELLOW "Worldserver pane ($world_target_pane) not found or not matching title '$WORLDSERVER_PANE_TITLE'." false
+        print_message $YELLOW "Worldserver pane ($world_target_pane) not found." false
     fi
 
     # Check if authserver pane (0.0) exists
-    if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index} #{pane_title}" | grep -q -E "^0($|\s.*$AUTHSERVER_PANE_TITLE)"; then
+    if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^0$"; then # Check if pane 0.0 exists
         auth_pane_exists=true
     fi
 
     if $auth_pane_exists; then
         print_message $YELLOW "Stopping Authserver pane ($auth_target_pane) by sending C-c and killing pane..." false
-        tmux send-keys -t "$auth_target_pane" C-c
-        sleep 2
-        tmux kill-pane -t "$auth_target_pane" 2>/dev/null || print_message $RED "Failed to kill Authserver pane. It might have already closed." false
-        print_message $GREEN "Authserver pane ($auth_target_pane) closed." false
+        tmux send-keys -t "$auth_target_pane" C-c # Send Ctrl+C
+        sleep 2 # Brief pause for C-c to take effect
+        tmux kill-pane -t "$auth_target_pane" 2>/dev/null || print_message $RED "Failed to kill Authserver pane $auth_target_pane." false
+        print_message $GREEN "Authserver pane ($auth_target_pane) stop command issued and pane killed." false
     else
-        print_message $YELLOW "Authserver pane ($auth_target_pane) not found or not matching title '$AUTHSERVER_PANE_TITLE'." false
+        print_message $YELLOW "Authserver pane ($auth_target_pane) not found." false
     fi
 
-    # After attempting to kill panes, check if the session is empty or should be killed.
-    # If both specific panes we targeted are gone, and assuming no other panes were in window 0,
-    # and assuming window 0 was the only window, then the session might be empty or closable.
-    # A simpler approach: if the session still exists after trying to kill panes, see if it has any panes left.
+    # After attempting to kill panes, check if the session should be killed.
+    # If window 0 is now empty (no panes left), kill the session.
     if tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
-        if ! tmux list-panes -t "$TMUX_SESSION_NAME:0" &> /dev/null; then # Check if window 0 has any panes
+        if ! tmux list-panes -t "$TMUX_SESSION_NAME:0" &> /dev/null; then
              print_message $CYAN "No more panes in window 0 of session '$TMUX_SESSION_NAME'. Killing session..." false
              tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null
              print_message $GREEN "TMUX Session '$TMUX_SESSION_NAME' killed." false
         else
-             # This case means some panes might still exist (e.g. if kill-pane failed or there were other panes)
-             print_message $YELLOW "Session '$TMUX_SESSION_NAME' still active. Panes might still exist or failed to close." false
+             # This might happen if kill-pane failed or if user created other panes/windows.
+             print_message $YELLOW "Session '$TMUX_SESSION_NAME' still active. Panes might still exist." false
              print_message $YELLOW "Consider manual check: tmux attach -t $TMUX_SESSION_NAME" false
         fi
     fi
@@ -1537,99 +1567,125 @@ restart_servers() {
     return 0
 }
 
-# Function to check server status
+# Function to check server status in TMUX
+# This function checks for the TMUX session, then specific panes for Authserver and Worldserver.
+# It attempts to identify processes by:
+#   1. Direct PID command arguments: Checks if the command running under pane_pid is the server.
+#   2. Child processes of pane_pid: Checks if the server is a child of the main pane process.
+# It also checks if server ports (3724 for Auth, 8085 for World) are listening.
+# Status messages are color-coded:
+#   GREEN:  Process name matches and port is listening. Strongest indication of a healthy server.
+#           For Worldserver, if PID is shared with Auth, GREEN if port is listening (process check is complex).
+#   YELLOW: Partial success or indeterminate state. E.g.,
+#           - Port listening but process name not confirmed.
+#           - Process name confirmed but port not listening.
+#           - Server/pane stopped or not found as expected.
+#   RED:    Pane PID found, but both process name and port checks are negative/problematic.
 check_server_status() {
     print_message $BLUE "--- Checking AzerothCore Server Status ---" true
 
+    # Check if TMUX is installed
     if ! command -v tmux &> /dev/null; then
         print_message $RED "TMUX is not installed. Cannot determine server status." true
         return 1
     fi
 
+    # Check if the TMUX session exists
     if ! tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
         print_message $YELLOW "TMUX session '$TMUX_SESSION_NAME' is not running." false
-        print_message $GREEN "Authserver: Stopped" false
-        print_message $GREEN "Worldserver: Stopped" false
+        print_message $GREEN "Authserver: Stopped (TMUX session not found)" false # Simplified message
+        print_message $GREEN "Worldserver: Stopped (TMUX session not found)" false # Simplified message
         return 0
     fi
 
     print_message $GREEN "TMUX Session '$TMUX_SESSION_NAME': Running" false
 
+    # Define pane targets (pane 0.0 for Authserver, 0.1 for Worldserver in window 0)
     local auth_server_pane="$TMUX_SESSION_NAME:0.0"
     local world_server_pane="$TMUX_SESSION_NAME:0.1"
 
+    # Variables for Authserver status
     local auth_pid=""
     local auth_direct_match_found=false
     local auth_child_match_found=false
     local auth_process_likely_running=false
     local auth_port_listening=false
     local auth_status_msg=""
-    local auth_status_color=$YELLOW
+    local auth_status_color=$YELLOW # Default to yellow for indeterminate/warning states
 
+    # Variables for Worldserver status
     local world_pid=""
     local world_direct_match_found=false
     local world_child_match_found=false
     local world_process_likely_running=false
     local world_port_listening=false
     local world_status_msg=""
-    local world_status_color=$YELLOW
-    local world_pid_is_shared_with_auth=false # New flag
+    local world_status_color=$YELLOW # Default to yellow
+    local world_pid_is_shared_with_auth=false # Flag to check if worldserver pane PID is same as authserver
 
     # --- Authserver Check ---
+    # Get PID of the process in the Authserver pane
     auth_pid=$(tmux list-panes -t "$auth_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
     if [ -n "$auth_pid" ]; then
-        # Primary process check
+        # 1. Direct Process Check: Check if the command for auth_pid is 'authserver'
         if ps -p "$auth_pid" -o args= | grep -Eq "(^|/)authserver(\s|$|--)"; then
             auth_direct_match_found=true
         fi
-        # Child process check (if direct match failed)
+        # 2. Child Process Check: If direct match failed, check if 'authserver' is a child process of auth_pid
+        # This handles cases where the pane might be running a shell that then launched the server.
         if ! $auth_direct_match_found; then
             if ps -o args= -H --ppid "$auth_pid" | grep -Eq "(^|/)authserver(\s|$|--)"; then
                 auth_child_match_found=true
             fi
         fi
+        # Process is considered likely running if either direct or child match was found
         if $auth_direct_match_found || $auth_child_match_found; then
             auth_process_likely_running=true
         fi
     fi
 
-    # Authserver Port Check
+    # Authserver Port Check (Port 3724)
     if nc -z localhost 3724 &>/dev/null; then
         auth_port_listening=true
     fi
 
-    # Construct Authserver Status Message
+    # Construct Authserver Status Message based on findings
     if $auth_port_listening && $auth_process_likely_running; then
         auth_status_msg="Authserver: Running (PID: $auth_pid, Process Name OK), Port 3724: Listening"
         auth_status_color=$GREEN
     elif $auth_port_listening && ! $auth_process_likely_running; then
         auth_status_msg="Authserver: Port 3724 Listening (Process name check inconclusive for pane PID $auth_pid)"
-        auth_status_color=$YELLOW
+        # Stays YELLOW as port is good, but process name is unexpected for the pane's direct/child PID.
     elif ! $auth_port_listening && $auth_process_likely_running; then
         auth_status_msg="Authserver: Process Found (PID: $auth_pid, Name OK), Port 3724: Not Listening"
-        auth_status_color=$YELLOW
-    elif [ -n "$auth_pid" ]; then # Pane PID exists but process/port non-responsive
+        # Stays YELLOW as process is there but port is not responding.
+    elif [ -n "$auth_pid" ]; then # Pane PID exists but process name not matched AND port not listening
         auth_status_msg="Authserver: Pane $auth_server_pane active (PID: $auth_pid), but process/port non-responsive."
-        auth_status_color=$RED
-    else # Pane PID does not exist
+        auth_status_color=$RED # More critical: pane active, but server seems dead/unresponsive.
+    else # Pane or PID for Authserver not found
         auth_status_msg="Authserver: Stopped (Pane $auth_server_pane not found or no PID)"
-        auth_status_color=$YELLOW
+        # Stays YELLOW as this is a clear "stopped" state for this pane.
     fi
     print_message "$auth_status_color" "$auth_status_msg" false
 
     # --- Worldserver Check ---
+    # Get PID of the process in the Worldserver pane
     world_pid=$(tmux list-panes -t "$world_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
 
+    # Check if Worldserver pane PID is the same as Authserver pane PID
     if [ -n "$world_pid" ] && [ "$world_pid" == "$auth_pid" ]; then
         world_pid_is_shared_with_auth=true
+        # If PIDs are shared, process name check for worldserver against this PID is complex/misleading.
+        # We will rely more on port status for worldserver in this specific scenario.
     fi
 
+    # Perform process name check for Worldserver only if PID is not shared (or if world_pid is empty, this block is skipped)
     if [ -n "$world_pid" ] && [ "$world_pid_is_shared_with_auth" = false ]; then
-        # Primary process check
+        # 1. Direct Process Check for Worldserver
         if ps -p "$world_pid" -o args= | grep -Eq "(^|/)worldserver(\s|$|--)"; then
             world_direct_match_found=true
         fi
-        # Child process check
+        # 2. Child Process Check for Worldserver
         if ! $world_direct_match_found; then
             if ps -o args= -H --ppid "$world_pid" | grep -Eq "(^|/)worldserver(\s|$|--)"; then
                 world_child_match_found=true
@@ -1638,39 +1694,40 @@ check_server_status() {
         if $world_direct_match_found || $world_child_match_found; then
             world_process_likely_running=true
         fi
-    fi # End of process check block for non-shared PID
+    fi
 
-    # Worldserver Port Check
+    # Worldserver Port Check (Port 8085)
     if nc -z localhost 8085 &>/dev/null; then
         world_port_listening=true
     fi
 
-    # Construct Worldserver Status Message
+    # Construct Worldserver Status Message based on findings
     if $world_port_listening; then
         if $world_process_likely_running; then # Implies PIDs were different and name check passed
             world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port 8085: Listening"
             world_status_color=$GREEN
         elif $world_pid_is_shared_with_auth; then
+             # If PIDs are shared, port listening is the strongest positive signal for Worldserver.
              world_status_msg="Worldserver: Port 8085 Listening (Process name check complex due to shared pane PID with Authserver: $world_pid)"
-             world_status_color=$GREEN # Port is the strong indicator here
+             world_status_color=$GREEN
         else # Port listening, but process name check failed (and PID not shared or was different and still failed)
             world_status_msg="Worldserver: Port 8085 Listening (Process name check inconclusive for pane PID $world_pid)"
-            world_status_color=$YELLOW
+            # Stays YELLOW
         fi
     else # Port not listening
         if $world_process_likely_running; then # Implies PIDs were different and name check passed
             world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port 8085: Not Listening"
-            world_status_color=$YELLOW
-        elif [ -n "$world_pid" ]; then # Pane PID exists but port not listening and process name not confirmed (or shared PID)
+            # Stays YELLOW
+        elif [ -n "$world_pid" ]; then # Pane PID exists but port not listening AND (process name not confirmed OR PID shared)
             if $world_pid_is_shared_with_auth; then
                  world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid, shared with Authserver), Port 8085: Not Listening."
-            else
+            else # PID not shared, but process name check failed
                  world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid), but Worldserver process/port non-responsive."
             fi
-            world_status_color=$RED
-        else # Pane PID does not exist for worldserver
+            world_status_color=$RED # More critical
+        else # Pane or PID for Worldserver not found
             world_status_msg="Worldserver: Stopped (Pane $world_server_pane not found or no PID)"
-            world_status_color=$YELLOW
+            # Stays YELLOW
         fi
     fi
     print_message "$world_status_color" "$world_status_msg" false

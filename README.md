@@ -5,9 +5,10 @@ This script is designed to help you **update**, **build**, **run**, and **manage
 ---
 
 ## Features:
-- **Dependency Check**: Automatically checks for essential software like `git`, `cmake`, `make`, `clang`, `clang++`, `tmux`, etc. If missing, it will prompt you to install them.
+- **Dependency Check**: Automatically checks for essential software like `git`, `cmake`, `make`, `clang`, `clang++`, `tmux`, `nc`, etc. If missing, it will prompt you to install them.
 - **Source Code Update**: Allows you to update your existing AzerothCore server's source code from its Git repository.
 - **Rebuilding the Server**: Uses `cmake` and `make` to rebuild and reinstall the updated AzerothCore server, with an option to specify the number of CPU cores for faster builds.
+- **Safety Check**: Prompts the user to stop running servers before a rebuild operation to prevent conflicts and ensure a clean build process.
 - **Process Management**: Advanced control over server processes, including starting, stopping, restarting, and checking the status of `authserver` and `worldserver` within their TMUX session.
 - **Backup and Restore**: Easily backup your server's databases (world, characters, auth) and server configuration files (`worldserver.conf`, `authserver.conf`). Restore from existing backups.
 - **Log Viewer**: View script operation logs, as well as live (`tail -f`) or static (`less`) `authserver` and `worldserver` logs directly through the script.
@@ -37,7 +38,7 @@ This script is designed to help you **update**, **build**, **run**, and **manage
 
 When you run `ACrebuild.sh`, it presents an interactive main menu with several categories:
 
--   **Server Operations**: Options to rebuild and/or run your AzerothCore server, update source code, and manage custom modules.
+-   **Server Operations**: Options to update source code, manage custom modules, and perform server rebuilds (with an option to also run the server post-rebuild). Server starting is also handled under "Process Management".
 -   **Server Management**:
     -   **Process Management**: Control starting, stopping, and restarting `authserver` and `worldserver`. Check their status within the TMUX session.
     -   **Backup/Restore Options**: Create new backups of your databases and server configurations, or restore from a previously created backup.
@@ -46,7 +47,7 @@ When you run `ACrebuild.sh`, it presents an interactive main menu with several c
     -   **Configuration Options**: Manage the script's settings. You can view the current configuration, edit the configuration file directly, or reset all settings to their defaults.
     -   **Quit Script**: Exits the `ACrebuild.sh` script.
 
-The script uses `tmux` to run `authserver` and `worldserver` in a manageable session, allowing you to detach and reattach to view server console output.
+The script uses `tmux` to run `authserver` and `worldserver` in a manageable split-pane session (one window with two panes), allowing you to detach and reattach to view server console output.
 
 ---
 
