@@ -490,7 +490,7 @@ show_menu() {
     echo ""
     print_message $CYAN " Script Maintenance:" true
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        print_message $YELLOW "  [8] Self-Update ACrebuild Script   (Shortcut: A)" false
+        print_message $YELLOW "  [8] Self-Update ACrebuild Script  (Shortcut: A)" false
     fi
     print_message $CYAN " Exit:" true
     print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false # Renumbered from [8]
