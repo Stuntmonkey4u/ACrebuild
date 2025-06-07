@@ -153,7 +153,6 @@ check_for_script_updates() {
         # The third argument 'false' means the message text will not be bold.
         echo ""
         print_message "$YELLOW" "An update is available to ACrebuild" false
-        echo ""
     fi
 }
 
