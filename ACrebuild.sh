@@ -624,16 +624,81 @@ main_menu() {
     done
 }
 
+# Function to run a countdown timer and wait for user input
+run_countdown_timer() {
+    local DURATION=$1
+    local USER_INPUT=""
+    local TIMEOUT=$DURATION
+
+    while [[ $TIMEOUT -gt 0 ]]; do
+        MINUTES=$((TIMEOUT / 60))
+        SECONDS=$((TIMEOUT % 60))
+        # Use \r to return cursor to the beginning of the line for continuous update
+        printf "\r${YELLOW}${BOLD}Enter your choice (y/n): Defaulting to 'yes' in %02d:%02d... ${NC}" "$MINUTES" "$SECONDS"
+
+        read -r -t 1 USER_INPUT
+
+        if [[ -n "$USER_INPUT" ]]; then
+            echo "" # Newline after user input
+            if [[ "$USER_INPUT" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+                return 0 # Yes
+            elif [[ "$USER_INPUT" =~ ^[Nn]([Oo])?$ ]]; then
+                return 1 # No
+            else
+                # Optional: Handle invalid input during countdown differently, or let it be handled by the caller
+                print_message $RED "\nInvalid input: '$USER_INPUT'. Please enter 'y' or 'n'." false
+                # For now, let's treat invalid input as 'no' to avoid accidental 'yes' on typo, or simply re-prompt.
+                # Re-prompting by continuing the loop. Let's clear the invalid input message.
+                printf "\r%80s\r" " " # Clear the line
+                USER_INPUT="" # Reset user input to continue loop or timeout
+                # Or, to be strict, uncomment below and exit/return specific code for invalid input
+                # return 2 # Invalid input code
+            fi
+        fi
+
+        TIMEOUT=$((TIMEOUT - 1))
+    done
+
+    echo "" # Newline after timeout
+    return 0 # Timeout (default to Yes)
+}
+
 # Function to handle errors
 handle_error() {
+    local error_message="$1"
     echo "" # Add whitespace before error
     print_message $RED "--------------------------------------------------------------------" true
-    print_message $RED "ERROR: $1" true
-    if [[ "$1" == *"CMake configuration failed"* || "$1" == *"Build process ('make install') failed"* ]]; then
-        print_message $RED "Suggestion: Check the logs in your build directory ($BUILD_DIR) for more details." true
-    elif [[ "$1" == *"authserver executable not found"* ]]; then # Added missing 'then' here
+    print_message $RED "ERROR: $error_message" true
+
+    if [[ "$error_message" == *"CMake configuration failed"* || "$error_message" == *"Build process ('make install') failed"* ]]; then
+        print_message $YELLOW "A build failure occurred. Would you like to run 'make clean' to try and fix it?" true
+
+        run_countdown_timer 900 # Call the countdown function (900 seconds = 15 minutes)
+        local countdown_result=$?
+
+        if [ $countdown_result -eq 0 ]; then # User chose 'yes' or timed out
+            print_message $GREEN "Running 'make clean'..." true
+            if [ -d "$BUILD_DIR" ]; then
+                (cd "$BUILD_DIR" && make clean) || print_message $RED "Warning: 'make clean' encountered an error, but attempting rebuild anyway." false
+            else
+                print_message $RED "Build directory $BUILD_DIR not found. Cannot run 'make clean'." true
+            fi
+            print_message $BLUE "Attempting to rebuild..." true
+            build_and_install_with_spinner
+            print_message $GREEN "Rebuild process finished." true
+            exit 0
+        elif [ $countdown_result -eq 1 ]; then # User chose 'no'
+            print_message $RED "Skipping 'make clean'. Exiting." true
+            print_message $RED "--------------------------------------------------------------------" true
+            exit 1
+        # Optional: Handle other return codes from run_countdown_timer if you added them (e.g., for invalid input)
+        # else
+        #     print_message $RED "Invalid response from countdown. Exiting." true
+        #     exit 1
+        fi
+    elif [[ "$error_message" == *"authserver executable not found"* ]]; then
         print_message $RED "Suggestion: Ensure AzerothCore was built successfully and the path is correct." true
-    elif [[ "$1" == *"TMUX session"* ]]; then
+    elif [[ "$error_message" == *"TMUX session"* ]]; then
         print_message $RED "Suggestion: Ensure TMUX is installed ('sudo apt install tmux') and functioning correctly." true
     fi
     print_message $RED "--------------------------------------------------------------------" true
