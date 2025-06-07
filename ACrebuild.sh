@@ -97,6 +97,64 @@ check_script_git_status() {
     fi
 }
 
+# Function to check for script updates from Git repository
+check_for_script_updates() {
+    # This function should only run if the script is in a git repo with 'origin' remote
+    if [ "$SCRIPT_IS_GIT_REPO" != true ]; then
+        return
+    fi
+
+    # Check for network connectivity to github.com first
+    # -c 1: send 1 ICMP ECHO_REQUEST packet
+    # -W 1: wait 1 second for a response (timeout)
+    # &>/dev/null: suppress all output (stdout and stderr)
+    if ! ping -c 1 -W 1 github.com &>/dev/null; then
+        # Silently exit if github.com is not reachable
+        return
+    fi
+
+    # Silently fetch updates from 'origin' remote to update local remote-tracking branches
+    # -q: quiet mode, suppresses most output
+    # Errors during fetch are intentionally ignored for a silent background check.
+    # If fetch fails, subsequent comparisons will likely not indicate an update, which is acceptable.
+    git -C "$SCRIPT_DIR_PATH" fetch origin -q
+
+    # Get the commit hash of the local HEAD
+    # 2>/dev/null: suppress stderr if the command fails (e.g., not a git repo, though SCRIPT_IS_GIT_REPO should prevent this)
+    LOCAL_HEAD=$(git -C "$SCRIPT_DIR_PATH" rev-parse HEAD 2>/dev/null)
+    # If LOCAL_HEAD could not be determined, something is wrong; silently exit.
+    if [ -z "$LOCAL_HEAD" ]; then
+        return
+    fi
+
+    # Determine the default branch of the 'origin' remote (e.g., main, master)
+    # This requires SCRIPT_DIR_PATH to be set, which is done in check_script_git_status
+    DEFAULT_BRANCH=$(git -C "$SCRIPT_DIR_PATH" remote show origin 2>/dev/null | grep 'HEAD branch' | awk '{print $NF}')
+
+    # If the default branch could not be determined (e.g., remote misconfiguration, or grep/awk failed),
+    # then we cannot compare. Silently exit.
+    if [ -z "$DEFAULT_BRANCH" ]; then
+        return
+    fi
+
+    # Get the commit hash of the remote-tracking branch (e.g., refs/remotes/origin/main)
+    REMOTE_HEAD=$(git -C "$SCRIPT_DIR_PATH" rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
+    # If REMOTE_HEAD could not be determined (e.g., default branch deleted from remote, or never fetched),
+    # silently exit.
+    if [ -z "$REMOTE_HEAD" ]; then
+        return
+    fi
+
+    # Compare the local HEAD commit with the remote HEAD commit.
+    # If they are different, it means there's an update available.
+    if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
+        # Use the existing print_message function to display the notification.
+        # $YELLOW is a predefined color variable in the script.
+        # The third argument 'false' means the message text will not be bold.
+        print_message "$YELLOW" "An update is available to ACrebuild" false
+    fi
+}
+
 
 # Function to print the message with a specific color and optional bold text
 # Note: SCRIPT_LOG_DIR and SCRIPT_LOG_FILE are used here.
@@ -2103,6 +2161,7 @@ main_menu() {
 
     # Check the script's own Git status
     check_script_git_status
+    check_for_script_updates
 
     # Check for dependencies
     check_dependencies
