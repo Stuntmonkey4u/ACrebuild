@@ -42,6 +42,8 @@ DEFAULT_CORES_FOR_BUILD=""
 # Runtime variables - These will be loaded from config or set to default by load_config()
 AZEROTHCORE_DIR=""
 BUILD_DIR=""
+SCRIPT_DIR_PATH=""
+SCRIPT_IS_GIT_REPO=false
 AUTH_SERVER_EXEC=""
 WORLD_SERVER_EXEC=""
 BACKUP_DIR=""
@@ -58,6 +60,42 @@ WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confus
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
 CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
+
+# Function to check the Git status of the script's directory
+check_script_git_status() {
+    print_message $BLUE "Checking script's Git repository status..." true
+    # Determine the absolute directory path of the script
+    # Updated method for reliability, especially with symlinks or sourcing
+    CURRENT_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+    SCRIPT_DIR_PATH="$CURRENT_SCRIPT_DIR"
+
+    print_message $CYAN "Script is running from: $SCRIPT_DIR_PATH" false
+
+    if [ -d "$SCRIPT_DIR_PATH/.git" ]; then
+        print_message $GREEN "  .git directory found." false
+        # Confirm it's part of a Git working tree
+        if git -C "$SCRIPT_DIR_PATH" rev-parse --is-inside-work-tree &>/dev/null; then
+            print_message $GREEN "  Script directory is part of a Git working tree." false
+            # Check if 'origin' remote is configured
+            if git -C "$SCRIPT_DIR_PATH" remote get-url origin &>/dev/null; then
+                print_message $GREEN "  'origin' remote is configured for the script's repository." false
+                SCRIPT_IS_GIT_REPO=true
+                print_message $GREEN "Script is confirmed to be in a Git repository with an 'origin' remote." true
+            else
+                SCRIPT_IS_GIT_REPO=false
+                print_message $YELLOW "  'origin' remote is NOT configured for the script's repository." false
+                print_message $YELLOW "Script is in a Git repository, but 'origin' remote is missing." true
+            fi
+        else
+            SCRIPT_IS_GIT_REPO=false
+            print_message $YELLOW "  Script directory is NOT part of a Git working tree (rev-parse check failed)." false
+        fi
+    else
+        SCRIPT_IS_GIT_REPO=false
+        print_message $YELLOW "  .git directory NOT found in script directory." false
+        print_message $YELLOW "Script is not in a Git repository or .git is not accessible." true
+    fi
+}
 
 
 # Function to print the message with a specific color and optional bold text
@@ -450,8 +488,12 @@ show_menu() {
     print_message $YELLOW "  [6] Log Viewer                    (Shortcut: L)" false # Was [7]
     print_message $YELLOW "  [7] Configuration Options         (Shortcut: C)" false # Was [8]
     echo ""
+    print_message $CYAN " Script Maintenance:" true
+    if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
+        print_message $YELLOW "  [8] Self-Update ACrebuild Script   (Shortcut: A)" false
+    fi
     print_message $CYAN " Exit:" true
-    print_message $YELLOW "  [8] Quit Script                   (Shortcut: Q)" false # Was [9]
+    print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false # Renumbered from [8]
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -705,6 +747,100 @@ handle_backup_restore_choice() {
     if [[ "$backup_choice" != "3" ]]; then
         show_backup_restore_menu
     fi
+}
+
+# Function to self-update the script from its Git repository
+self_update_script() {
+    print_message $BLUE "--- ACrebuild Script Self-Update ---" true
+
+    # Ensure SCRIPT_DIR_PATH is set (should be by check_script_git_status)
+    if [ -z "$SCRIPT_DIR_PATH" ]; then
+        print_message $RED "Error: Script directory path not set. Cannot determine location for update." true
+        return 1
+    fi
+
+    print_message $CYAN "Changing to script directory: $SCRIPT_DIR_PATH" false
+    cd "$SCRIPT_DIR_PATH" || { print_message $RED "Error: Could not change to script directory '$SCRIPT_DIR_PATH'. Update aborted." true; return 1; }
+
+    # Fetch Updates
+    print_message $CYAN "Fetching remote updates for ACrebuild.sh..." false
+    if ! git fetch origin; then
+        print_message $RED "Error: 'git fetch origin' failed. Update aborted." true
+        # Attempt to change back to original directory if possible, though not critical for script exit/restart
+        OLDPWD_PREV="${OLDPWD:-$HOME}" # Fallback if OLDPWD is not set
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 1
+    fi
+
+    # Determine Default Branch
+    DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
+    if [ -z "$DEFAULT_BRANCH" ]; then
+        print_message $RED "Error: Could not determine the default remote branch (e.g., main, master). Update aborted." true
+        OLDPWD_PREV="${OLDPWD:-$HOME}"
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 1
+    fi
+    print_message $CYAN "Default remote branch detected as: $DEFAULT_BRANCH" false
+
+    # Check for Updates
+    LOCAL_HEAD=$(git rev-parse HEAD)
+    REMOTE_HEAD=$(git rev-parse "origin/$DEFAULT_BRANCH")
+
+    if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
+        print_message $GREEN "ACrebuild.sh is already up to date (version $LOCAL_HEAD)." true
+        OLDPWD_PREV="${OLDPWD:-$HOME}"
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 0 # Success, no update needed
+    fi
+
+    # Updates Available
+    print_message $YELLOW "An update is available for ACrebuild.sh." true
+    print_message $YELLOW "  Current version: $LOCAL_HEAD" false
+    print_message $YELLOW "  Available version: $REMOTE_HEAD" false
+
+    # Check for Local Changes
+    # `git status --porcelain` outputs machine-readable status. Empty means no changes.
+    if [ -n "$(git status --porcelain)" ]; then
+        print_message $RED "You have local uncommitted changes in the script directory." true
+        print_message $RED "Please commit or stash them before updating to prevent conflicts." true
+        print_message $RED "Update aborted." true
+        OLDPWD_PREV="${OLDPWD:-$HOME}"
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 1
+    fi
+
+    # Ask for Confirmation
+    print_message $YELLOW "Do you want to pull the latest changes? (y/n)" true
+    read -r updateConfirm
+    if [[ ! "$updateConfirm" =~ ^[Yy]$ ]]; then
+        print_message $GREEN "Self-update cancelled by user." false
+        OLDPWD_PREV="${OLDPWD:-$HOME}"
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 0 # User cancelled, not an error
+    fi
+
+    # Perform Update
+    print_message $CYAN "Pulling latest changes from origin/$DEFAULT_BRANCH..." false
+    if ! git pull origin "$DEFAULT_BRANCH"; then
+        print_message $RED "Error: 'git pull' failed. Update aborted. You might need to resolve conflicts manually." true
+        OLDPWD_PREV="${OLDPWD:-$HOME}"
+        cd "$OLDPWD_PREV" &>/dev/null
+        return 1
+    fi
+
+    print_message $GREEN "ACrebuild.sh updated successfully!" true
+    print_message $YELLOW "Restarting the script to apply changes..." true
+    sleep 2 # Give user a moment to read the message
+
+    # Change back to the original directory before exec, if possible,
+    # so the restarted script starts from the same CWD as the user initially ran it from.
+    OLDPWD_PREV="${OLDPWD:-$HOME}"
+    cd "$OLDPWD_PREV" &>/dev/null
+
+    exec "$0" "$@" # Replace current script process with the new version
+    # If exec fails for some reason (it shouldn't normally), exit to prevent unexpected behavior.
+    print_message $RED "Error: Failed to restart the script with exec. Please restart it manually." true
+    exit 1
 }
 
 # Function to view a log file
@@ -1086,7 +1222,7 @@ restore_backup() {
 # it resets BUILD_ONLY and RUN_SERVER flags and returns to the main menu loop.
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, Q, or 1-8]: ${NC}")" choice # Prompt reflects available options
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, A, Q, or 1-9]: ${NC}")" choice # Prompt updated
     case $choice in
         1|[Rr]) # [1] Rebuild and Run Server
             RUN_SERVER=true
@@ -1128,7 +1264,17 @@ handle_menu_choice() {
             BUILD_ONLY=false
             return
             ;;
-        8|[Qq]) # [8] Quit Script
+        8|[Aa]) # [8] Self-Update ACrebuild Script
+            if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
+                self_update_script # Call the new function
+            else
+                print_message $RED "Cannot self-update: This script is not in a recognized Git repository or 'origin' remote is missing." true
+            fi
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        9|[Qq]) # [9] Quit Script (Renumbered from 8)
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0
@@ -1954,6 +2100,9 @@ main_menu() {
 
     # Load configuration first
     load_config
+
+    # Check the script's own Git status
+    check_script_git_status
 
     # Check for dependencies
     check_dependencies
