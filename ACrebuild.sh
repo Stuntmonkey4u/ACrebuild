@@ -275,7 +275,7 @@ check_dependencies() {
     MISSING_DEPENDENCIES=() # Initialize the array here
 
     # List of dependencies to check
-    DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux")
+    DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc") # Added nc for netcat
     for DEP in "${DEPENDENCIES[@]}"; do
         command -v "$DEP" &>/dev/null
         if [ $? -ne 0 ]; then
@@ -444,14 +444,14 @@ show_menu() {
     print_message $YELLOW "  [3] Run Server Only               (Shortcut: S)" false
     print_message $YELLOW "  [4] Update Server Modules         (Shortcut: M)" false
     echo ""
-    print_message $CYAN " Server Management:" true # New section for Process Management
-    print_message $YELLOW "  [P] Process Management" false # Using 'P'
-    print_message $YELLOW "  [B] Backup/Restore Options" false
-    print_message $YELLOW "  [L] Log Viewer" false
+    print_message $CYAN " Server Management & Configuration:" true # Combined section header
+    print_message $YELLOW "  [5] Process Management            (Shortcut: P)" false
+    print_message $YELLOW "  [6] Backup/Restore Options      (Shortcut: B)" false
+    print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
+    print_message $YELLOW "  [8] Configuration Options         (Shortcut: C)" false
     echo ""
-    print_message $CYAN " Configuration & Exit:" true # Combined section
-    print_message $YELLOW "  [C] Configuration Options" false # Changed [5] to [C]
-    print_message $YELLOW "  [6] Quit Script                   (Shortcut: Q)" false # Kept one Quit option
+    print_message $CYAN " Exit:" true
+    print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -1083,61 +1083,59 @@ restore_backup() {
 # Function to handle user input for the menu
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, S, M, P, B, L, C, Q, or 1-6]: ${NC}")" choice # Added P for Process Management
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, S, M, P, B, L, C, Q, or 1-9]: ${NC}")" choice # Updated range to 1-9
     case $choice in
         1|[Rr]) # Rebuild and Run
             RUN_SERVER=true
             BUILD_ONLY=true
             ;;
-        2|[Uu]) # bUild Server Only (was B)
+        2|[Uu]) # bUild Server Only
             RUN_SERVER=false
             BUILD_ONLY=true
-            ;;
-        [Bb]) # Backup/Restore Menu (New)
-            show_backup_restore_menu
-            RUN_SERVER=false # Ensure flags are reset
-            BUILD_ONLY=false
-            return
-            ;;
-        [Pp]) # Process Management Menu (New)
-            show_process_management_menu
-            RUN_SERVER=false # Ensure flags are reset
-            BUILD_ONLY=false
-            return
-            ;;
-        [Ll]) # Log Viewer Menu
-            show_log_viewer_menu
-            RUN_SERVER=false # Ensure flags are reset
-            BUILD_ONLY=false
-            return
             ;;
         3|[Ss]) # Run Server Only
             RUN_SERVER=true
             BUILD_ONLY=false
             ;;
-        4|[Mm])
+        4|[Mm]) # Update Server Modules
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
-            # Ensure flags are reset if returning from module update without other actions
-            RUN_SERVER=false 
-            BUILD_ONLY=false
-            return # Return to main menu to avoid falling through
-            ;;
-        5|[Cc]) # Changed 5 to C, and C now calls config menu
-            show_config_management_menu
-            # Ensure flags are reset if returning from status display
             RUN_SERVER=false
             BUILD_ONLY=false
-            return # Return to main menu to avoid falling through
+            return
             ;;
-        6|[Qq])
+        5|[Pp]) # Process Management
+            show_process_management_menu
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        6|[Bb]) # Backup/Restore Options
+            show_backup_restore_menu
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        7|[Ll]) # Log Viewer
+            show_log_viewer_menu
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        8|[Cc]) # Configuration Options
+            show_config_management_menu
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        9|[Qq]) # Quit Script
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0
             ;;
         *)
             echo ""
-            print_message $RED "Invalid choice. Please select a valid option (R, B, S, M, C, Q, or 1-6)." false
+            print_message $RED "Invalid choice. Please select a valid option from the menu." false # Generic error
             return
             ;;
     esac
@@ -1525,57 +1523,69 @@ check_server_status() {
 
     print_message $GREEN "TMUX Session '$TMUX_SESSION_NAME': Running" false
 
-    local auth_status="Stopped"
-    local world_status="Stopped"
+    local auth_server_pane="$TMUX_SESSION_NAME:0.0"
+    local world_server_pane="$TMUX_SESSION_NAME:0.1"
     local auth_pid=""
     local world_pid=""
+    local auth_process_status="Process Not Found"
+    local world_process_status="Process Not Found"
+    local auth_port_status="Port Not Checked"
+    local world_port_status="Port Not Checked"
+    local auth_final_status_color=$YELLOW # Default to yellow
+    local world_final_status_color=$YELLOW # Default to yellow
 
-    # Check Authserver in pane 0.0
-    # Target pane by session:window.pane index
-    local auth_target_pane="$TMUX_SESSION_NAME:0.0"
-    auth_pid=$(tmux list-panes -t "$auth_target_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
-
+    # Check Authserver Process
+    auth_pid=$(tmux list-panes -t "$auth_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
     if [ -n "$auth_pid" ]; then
-        # Check if the process with this PID is 'authserver'
-        if ps -p "$auth_pid" -o comm= | grep -q "authserver"; then
-            auth_status="Running (PID: $auth_pid in pane $auth_target_pane)"
+        if ps -p "$auth_pid" -o args= | grep -Eq "(^|/)authserver(\s|$|--)"; then
+            auth_process_status="Running (PID: $auth_pid)"
         else
-            # Pane exists, PID exists, but not authserver
-            auth_status="Pane $auth_target_pane (PID: $auth_pid) active, but not running 'authserver' or process exited."
+            auth_process_status="PID $auth_pid found, but not 'authserver' (or exited)."
         fi
     else
-        # Pane 0.0 itself might not exist or no PID found
-        auth_status="Authserver pane $auth_target_pane not found or no process PID."
+        auth_process_status="Pane $auth_server_pane not found or no PID."
     fi
 
-    # Check Worldserver in pane 0.1
-    local world_target_pane="$TMUX_SESSION_NAME:0.1"
-    world_pid=$(tmux list-panes -t "$world_target_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
+    # Check Authserver Port (Port 3724)
+    if nc -z localhost 3724; then
+        auth_port_status="Listening"
+    else
+        auth_port_status="Not Listening"
+    fi
 
+    # Determine Authserver final status and color
+    if [[ "$auth_process_status" == "Running"* ]] && [ "$auth_port_status" == "Listening" ]; then
+        auth_final_status_color=$GREEN
+    fi
+    print_message $auth_final_status_color "Authserver: $auth_process_status, Port 3724: $auth_port_status" false
+
+    # Check Worldserver Process
+    world_pid=$(tmux list-panes -t "$world_server_pane" -F "#{pane_pid}" 2>/dev/null | head -n 1)
     if [ -n "$world_pid" ]; then
-        if ps -p "$world_pid" -o comm= | grep -q "worldserver"; then
-            world_status="Running (PID: $world_pid in pane $world_target_pane)"
+        if ps -p "$world_pid" -o args= | grep -Eq "(^|/)worldserver(\s|$|--)"; then
+            world_process_status="Running (PID: $world_pid)"
         else
-            world_status="Pane $world_target_pane (PID: $world_pid) active, but not running 'worldserver' or process exited."
+            world_process_status="PID $world_pid found, but not 'worldserver' (or exited)."
         fi
     else
-        world_status="Worldserver pane $world_target_pane not found or no process PID."
+        world_process_status="Pane $world_server_pane not found or no PID."
     fi
 
-    if [[ "$auth_status" == "Running"* ]]; then
-        print_message $GREEN "Authserver: $auth_status" false
+    # Check Worldserver Port (Port 8085)
+    if nc -z localhost 8085; then
+        world_port_status="Listening"
     else
-        print_message $YELLOW "Authserver: $auth_status" false
+        world_port_status="Not Listening"
     fi
 
-    if [[ "$world_status" == "Running"* ]]; then
-        print_message $GREEN "Worldserver: $world_status" false
-    else
-        print_message $YELLOW "Worldserver: $world_status" false
+    # Determine Worldserver final status and color
+    if [[ "$world_process_status" == "Running"* ]] && [ "$world_port_status" == "Listening" ]; then
+        world_final_status_color=$GREEN
     fi
+    print_message $world_final_status_color "Worldserver: $world_process_status, Port 8085: $world_port_status" false
 
     echo ""
-    print_message $CYAN "Note: Status is based on TMUX session/window names and process checks." false
+    print_message $CYAN "Note: Status is based on TMUX pane PIDs, process arguments, and port checks." false
     print_message $CYAN "For definitive status, attach to TMUX: tmux attach -t $TMUX_SESSION_NAME" false
     return 0
 }
