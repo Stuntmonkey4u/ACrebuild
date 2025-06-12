@@ -17,7 +17,7 @@ SERVER_CONFIG_FILES=("authserver.conf" "worldserver.conf") # Array of config fil
 TMUX_SESSION_NAME="azeroth"
 AUTHSERVER_PANE_TITLE="Authserver" # Used in current script, good to formalize
 WORLDSERVER_PANE_TITLE="Worldserver" # Used in current script, good to formalize
-WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 300" # 300 seconds = 5 minutes for graceful shutdown
+WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes for graceful shutdown
 
 # Configuration File Variables
 CONFIG_DIR="$HOME/.ACrebuild"
