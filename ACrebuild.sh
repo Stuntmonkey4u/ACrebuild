@@ -17,7 +17,7 @@ SERVER_CONFIG_FILES=("authserver.conf" "worldserver.conf") # Array of config fil
 TMUX_SESSION_NAME="azeroth"
 AUTHSERVER_PANE_TITLE="Authserver" # Used in current script, good to formalize
 WORLDSERVER_PANE_TITLE="Worldserver" # Used in current script, good to formalize
-WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes for graceful shutdown
+WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 300" # 300 seconds = 5 minutes for graceful shutdown
 
 # Configuration File Variables
 CONFIG_DIR="$HOME/.ACrebuild"
@@ -1700,35 +1700,15 @@ stop_servers() {
     if $world_pane_exists; then
         print_message $YELLOW "Sending graceful shutdown command ('$WORLDSERVER_CONSOLE_COMMAND_STOP') to Worldserver pane ($world_target_pane)..." false
         tmux send-keys -t "$world_target_pane" "$WORLDSERVER_CONSOLE_COMMAND_STOP" C-m
-
-        # Wait for Worldserver to shut down by checking port 8085
-        local shutdown_timer=0
-        local max_shutdown_wait=300 # 300 seconds = 5 minutes
-        print_message $CYAN "Waiting for Worldserver (port 8085) to shut down (up to $max_shutdown_wait seconds)..." false
-        local spinner_chars="/-\\|"
-
-        while nc -z localhost 8085 &>/dev/null; do
-            shutdown_timer=$((shutdown_timer + 1))
-            if [ "$shutdown_timer" -gt "$max_shutdown_wait" ]; then
-                print_message $RED "Worldserver did not shut down within $max_shutdown_wait seconds. Proceeding with pane kill." true
-                break
-            fi
-            local char_index=$((shutdown_timer % ${#spinner_chars}))
-            echo -ne "\r${CYAN}Waiting... ${spinner_chars:$char_index:1} (Attempt: $shutdown_timer/$max_shutdown_wait)${NC}  "
-            sleep 1
-        done
-        echo -ne "\r${NC}                                                                          \r" # Clear spinner line
-
-        if ! nc -z localhost 8085 &>/dev/null; then
-            print_message $GREEN "Worldserver on port 8085 has shut down." false
-        fi
+        print_message $CYAN "Waiting a few seconds for Worldserver to process shutdown..." false
+        sleep 10 # Give time for graceful shutdown to initiate
 
         # Re-check if pane 0.1 still exists after graceful shutdown attempt
         if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^1$"; then
              print_message $YELLOW "Worldserver pane ($world_target_pane) still exists. Forcing closure." false
              tmux kill-pane -t "$world_target_pane" 2>/dev/null || print_message $RED "Failed to kill Worldserver pane $world_target_pane." false
         else
-            print_message $GREEN "Worldserver pane ($world_target_pane) closed (likely from graceful shutdown or port closure)." false
+            print_message $GREEN "Worldserver pane ($world_target_pane) closed (likely from graceful shutdown)." false
         fi
     else
         print_message $YELLOW "Worldserver pane ($world_target_pane) not found." false
