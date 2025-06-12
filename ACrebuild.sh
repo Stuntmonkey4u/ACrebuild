@@ -32,9 +32,10 @@ DEFAULT_AUTH_DB_NAME="acore_auth"
 DEFAULT_CHAR_DB_NAME="acore_characters"
 DEFAULT_WORLD_DB_NAME="acore_world"
 DEFAULT_SERVER_CONFIG_DIR_PATH_SUFFIX="env/dist/etc"
-DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/logs"
-DEFAULT_AUTH_SERVER_LOG_FILENAME="authserver.log"
-DEFAULT_WORLD_SERVER_LOG_FILENAME="worldserver.log"
+DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/bin"
+DEFAULT_AUTH_SERVER_LOG_FILENAME="Auth.log"
+DEFAULT_WORLD_SERVER_LOG_FILENAME="Server.log"
+DEFAULT_ERROR_LOG_FILENAME="Errors.log"
 DEFAULT_SCRIPT_LOG_DIR="$HOME/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
 DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
@@ -57,6 +58,7 @@ SERVER_CONFIG_DIR_PATH=""
 SERVER_LOG_DIR_PATH=""
 AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
 WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
+ERROR_LOG_FILENAME=""
 # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
@@ -235,6 +237,7 @@ load_config() {
 
     AUTH_SERVER_LOG_FILENAME="${AUTH_SERVER_LOG_FILENAME:-$DEFAULT_AUTH_SERVER_LOG_FILENAME}"
     WORLD_SERVER_LOG_FILENAME="${WORLD_SERVER_LOG_FILENAME:-$DEFAULT_WORLD_SERVER_LOG_FILENAME}"
+    ERROR_LOG_FILENAME="${ERROR_LOG_FILENAME:-$DEFAULT_ERROR_LOG_FILENAME}"
 
     # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF are read from config file
     # Then we set the main SCRIPT_LOG_DIR and SCRIPT_LOG_FILE used by print_message
@@ -350,6 +353,9 @@ AUTH_SERVER_LOG_FILENAME="$DEFAULT_AUTH_SERVER_LOG_FILENAME"
 
 # Filename for the world server log (located in SERVER_LOG_DIR_PATH)
 WORLD_SERVER_LOG_FILENAME="$DEFAULT_WORLD_SERVER_LOG_FILENAME"
+
+# Filename for the server errors log (located in SERVER_LOG_DIR_PATH)
+ERROR_LOG_FILENAME="$DEFAULT_ERROR_LOG_FILENAME"
 
 # Directory for the ACrebuild script's own log files
 SCRIPT_LOG_DIR="$DEFAULT_SCRIPT_LOG_DIR"
@@ -703,12 +709,13 @@ show_log_viewer_menu() {
     print_message $YELLOW "Select a log to view:" true
     echo ""
     print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
-    print_message $YELLOW "  [2] View Auth Server Log (authserver.log)" false
-    print_message $YELLOW "  [3] View World Server Log (worldserver.log)" false
-    print_message $YELLOW "  [4] Return to Main Menu" false
+    print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false # Use variable here
+    print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false   # Use variable here (for Server.log)
+    print_message $YELLOW "  [4] View Server Error Log ($ERROR_LOG_FILENAME)" false  # New entry, use variable
+    print_message $YELLOW "  [5] Return to Main Menu" false # Renumbered
     echo ""
     print_message $BLUE "---------------------------------------------------" true
-    handle_log_viewer_choice # Call a new handler for this menu
+    handle_log_viewer_choice
 }
 
 # Function to display process management menu
@@ -765,27 +772,22 @@ handle_process_management_choice() {
 # Function to handle log viewer menu choices
 handle_log_viewer_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" log_choice
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice # Updated prompt
     case $log_choice in
-        1)
-            view_script_log
-            ;;
-        2)
-            view_auth_log
-            ;;
-        3)
-            view_world_log
-            ;;
-        4)
+        1) view_script_log ;;
+        2) view_auth_log ;;
+        3) view_world_log ;;
+        4) view_error_log ;; # New case
+        5) # Return to Main Menu - Updated case number
             print_message $GREEN "Returning to Main Menu..." false
             return
             ;;
         *)
-            print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+            print_message $RED "Invalid choice. Please select a valid option (1-5)." false # Updated message
             ;;
     esac
     # After an action, explicitly call show_log_viewer_menu again
-    if [[ "$log_choice" != "4" ]]; then
+    if [[ "$log_choice" != "5" ]]; then # Updated condition
         show_log_viewer_menu
     fi
 }
@@ -976,6 +978,12 @@ view_world_log() {
     print_message $CYAN "Accessing world server log..." false
     local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
     view_log_file "$full_world_log_path" true # true means prompt for view mode
+}
+
+view_error_log() {
+    print_message $CYAN "Accessing server error log..." false
+    local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
+    view_log_file "$full_error_log_path" true # true means prompt for view mode (less/tail)
 }
 
 # Function to list available backups
@@ -1757,12 +1765,6 @@ stop_servers() {
 
         if ! nc -z localhost 8085 &>/dev/null; then
             print_message $GREEN "Worldserver on port 8085 has shut down." false
-        fi
-
-        # Check if a post-shutdown delay is configured and positive
-        if [ -n "$POST_SHUTDOWN_DELAY_SECONDS" ] && [ "$POST_SHUTDOWN_DELAY_SECONDS" -gt 0 ]; then
-            print_message $CYAN "Waiting an additional ${POST_SHUTDOWN_DELAY_SECONDS}s for any final server processes to complete..." false
-            sleep "$POST_SHUTDOWN_DELAY_SECONDS"
         fi
 
         # Check if a post-shutdown delay is configured and positive
