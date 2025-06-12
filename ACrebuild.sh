@@ -711,7 +711,7 @@ show_log_viewer_menu() {
     print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
     print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false # Use variable here
     print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false   # Use variable here (for Server.log)
-    print_message $YELLOW "  [4] View Server Error Log ($ERROR_LOG_FILENAME)" false  # New entry, use variable
+    print_message $YELLOW "  [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false  # New entry, use variable
     print_message $YELLOW "  [5] Return to Main Menu" false # Renumbered
     echo ""
     print_message $BLUE "---------------------------------------------------" true
