@@ -906,7 +906,8 @@ self_update_script() {
     OLDPWD_PREV="${OLDPWD:-$HOME}"
     cd "$OLDPWD_PREV" &>/dev/null
 
-    exec "$0" "$@" # Replace current script process with the new version
+    local script_actual_name=$(basename "${BASH_SOURCE[0]}")
+    exec "$SCRIPT_DIR_PATH/$script_actual_name" "$@" # Replace current script process with the new version
     # If exec fails for some reason (it shouldn't normally), exit to prevent unexpected behavior.
     print_message $RED "Error: Failed to restart the script with exec. Please restart it manually." true
     exit 1
