@@ -1002,6 +1002,7 @@ list_backups() {
         BACKUP_FILES[i]="$backup_file" # Store full path
         i=$((i+1))
     done
+    print_message $CYAN "  [0] Go Back to Backup/Restore Menu" false
     echo ""
     return 0
 }
@@ -1148,6 +1149,12 @@ restore_backup() {
     print_message $YELLOW "Enter the number of the backup to restore:" true
     read -r backup_choice
     echo ""
+
+    # Check if user wants to go back
+    if [[ "$backup_choice" == "0" ]]; then
+        print_message $GREEN "Returning to Backup/Restore menu..." false
+        return 0 # Or just return, as it goes back to the menu loop
+    fi
 
     # Validate input
     if ! [[ "$backup_choice" =~ ^[0-9]+$ ]] || [ "$backup_choice" -lt 1 ] || [ "$backup_choice" -gt ${#BACKUP_FILES[@]} ]; then
