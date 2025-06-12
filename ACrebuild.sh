@@ -17,7 +17,7 @@ SERVER_CONFIG_FILES=("authserver.conf" "worldserver.conf") # Array of config fil
 TMUX_SESSION_NAME="azeroth"
 AUTHSERVER_PANE_TITLE="Authserver" # Used in current script, good to formalize
 WORLDSERVER_PANE_TITLE="Worldserver" # Used in current script, good to formalize
-WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 300" # 300 seconds = 5 minutes for graceful shutdown
+WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes for graceful shutdown
 
 # Configuration File Variables
 CONFIG_DIR="$HOME/.ACrebuild"
@@ -32,11 +32,13 @@ DEFAULT_AUTH_DB_NAME="acore_auth"
 DEFAULT_CHAR_DB_NAME="acore_characters"
 DEFAULT_WORLD_DB_NAME="acore_world"
 DEFAULT_SERVER_CONFIG_DIR_PATH_SUFFIX="env/dist/etc"
-DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/logs"
-DEFAULT_AUTH_SERVER_LOG_FILENAME="authserver.log"
-DEFAULT_WORLD_SERVER_LOG_FILENAME="worldserver.log"
+DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/bin"
+DEFAULT_AUTH_SERVER_LOG_FILENAME="Auth.log"
+DEFAULT_WORLD_SERVER_LOG_FILENAME="Server.log"
+DEFAULT_ERROR_LOG_FILENAME="Errors.log"
 DEFAULT_SCRIPT_LOG_DIR="$HOME/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
+DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_CORES_FOR_BUILD=""
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
@@ -56,9 +58,11 @@ SERVER_CONFIG_DIR_PATH=""
 SERVER_LOG_DIR_PATH=""
 AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
 WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
+ERROR_LOG_FILENAME=""
 # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
+POST_SHUTDOWN_DELAY_SECONDS=""
 CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
 
 # Function to check the Git status of the script's directory
@@ -233,12 +237,14 @@ load_config() {
 
     AUTH_SERVER_LOG_FILENAME="${AUTH_SERVER_LOG_FILENAME:-$DEFAULT_AUTH_SERVER_LOG_FILENAME}"
     WORLD_SERVER_LOG_FILENAME="${WORLD_SERVER_LOG_FILENAME:-$DEFAULT_WORLD_SERVER_LOG_FILENAME}"
+    ERROR_LOG_FILENAME="${ERROR_LOG_FILENAME:-$DEFAULT_ERROR_LOG_FILENAME}"
 
     # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF are read from config file
     # Then we set the main SCRIPT_LOG_DIR and SCRIPT_LOG_FILE used by print_message
     SCRIPT_LOG_DIR="${SCRIPT_LOG_DIR:-$DEFAULT_SCRIPT_LOG_DIR}" # This uses the SCRIPT_LOG_DIR var from config file
     SCRIPT_LOG_FILENAME="${SCRIPT_LOG_FILENAME:-$DEFAULT_SCRIPT_LOG_FILENAME}" # Uses SCRIPT_LOG_FILENAME from config
 
+    POST_SHUTDOWN_DELAY_SECONDS="${POST_SHUTDOWN_DELAY_SECONDS:-$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS}"
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
 
     # --- Update dynamic paths based on loaded/defaulted AZEROTHCORE_DIR ---
@@ -280,7 +286,8 @@ save_config_value() {
     # For basic paths and simple strings, this might be overkill or needs more robust handling
     # For now, let's assume values are relatively simple or paths.
     # A more robust solution might use awk or a different tool for complex values.
-    local escaped_value=$(echo "$value_to_save" | sed -e 's/[\/&]/\\&/g')
+    local temp_escaped_value="${value_to_save//\\/\\\\}" # Escape backslashes: \ -> \\
+    local escaped_value="${temp_escaped_value//\"/\\\"}"  # Escape double quotes: " -> \"
 
     # Check if the key exists
     if grep -q "^${key_to_save}=" "$CONFIG_FILE"; then
@@ -347,6 +354,9 @@ AUTH_SERVER_LOG_FILENAME="$DEFAULT_AUTH_SERVER_LOG_FILENAME"
 # Filename for the world server log (located in SERVER_LOG_DIR_PATH)
 WORLD_SERVER_LOG_FILENAME="$DEFAULT_WORLD_SERVER_LOG_FILENAME"
 
+# Filename for the server errors log (located in SERVER_LOG_DIR_PATH)
+ERROR_LOG_FILENAME="$DEFAULT_ERROR_LOG_FILENAME"
+
 # Directory for the ACrebuild script's own log files
 SCRIPT_LOG_DIR="$DEFAULT_SCRIPT_LOG_DIR"
 
@@ -356,6 +366,10 @@ SCRIPT_LOG_FILENAME="$DEFAULT_SCRIPT_LOG_FILENAME"
 # Number of CPU cores to use for building AzerothCore
 # Leave empty or set to a number (e.g., 4). If empty, script will ask or use all available.
 CORES_FOR_BUILD="$DEFAULT_CORES_FOR_BUILD"
+
+# Number of seconds to wait after port 8085 is free before force-closing server panes.
+# This allows extra time for database writes or other cleanup tasks.
+POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
 
 EOF
     if [ $? -eq 0 ]; then
@@ -695,12 +709,13 @@ show_log_viewer_menu() {
     print_message $YELLOW "Select a log to view:" true
     echo ""
     print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
-    print_message $YELLOW "  [2] View Auth Server Log (authserver.log)" false
-    print_message $YELLOW "  [3] View World Server Log (worldserver.log)" false
-    print_message $YELLOW "  [4] Return to Main Menu" false
+    print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false # Use variable here
+    print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false   # Use variable here (for Server.log)
+    print_message $YELLOW "  [4] View Server Error Log ($ERROR_LOG_FILENAME)" false  # New entry, use variable
+    print_message $YELLOW "  [5] Return to Main Menu" false # Renumbered
     echo ""
     print_message $BLUE "---------------------------------------------------" true
-    handle_log_viewer_choice # Call a new handler for this menu
+    handle_log_viewer_choice
 }
 
 # Function to display process management menu
@@ -757,27 +772,22 @@ handle_process_management_choice() {
 # Function to handle log viewer menu choices
 handle_log_viewer_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" log_choice
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice # Updated prompt
     case $log_choice in
-        1)
-            view_script_log
-            ;;
-        2)
-            view_auth_log
-            ;;
-        3)
-            view_world_log
-            ;;
-        4)
+        1) view_script_log ;;
+        2) view_auth_log ;;
+        3) view_world_log ;;
+        4) view_error_log ;; # New case
+        5) # Return to Main Menu - Updated case number
             print_message $GREEN "Returning to Main Menu..." false
             return
             ;;
         *)
-            print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+            print_message $RED "Invalid choice. Please select a valid option (1-5)." false # Updated message
             ;;
     esac
     # After an action, explicitly call show_log_viewer_menu again
-    if [[ "$log_choice" != "4" ]]; then
+    if [[ "$log_choice" != "5" ]]; then # Updated condition
         show_log_viewer_menu
     fi
 }
@@ -898,7 +908,8 @@ self_update_script() {
     OLDPWD_PREV="${OLDPWD:-$HOME}"
     cd "$OLDPWD_PREV" &>/dev/null
 
-    exec "$0" "$@" # Replace current script process with the new version
+    local script_actual_name=$(basename "${BASH_SOURCE[0]}")
+    exec "$SCRIPT_DIR_PATH/$script_actual_name" "$@" # Replace current script process with the new version
     # If exec fails for some reason (it shouldn't normally), exit to prevent unexpected behavior.
     print_message $RED "Error: Failed to restart the script with exec. Please restart it manually." true
     exit 1
@@ -967,6 +978,12 @@ view_world_log() {
     print_message $CYAN "Accessing world server log..." false
     local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
     view_log_file "$full_world_log_path" true # true means prompt for view mode
+}
+
+view_error_log() {
+    print_message $CYAN "Accessing server error log..." false
+    local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
+    view_log_file "$full_error_log_path" true # true means prompt for view mode (less/tail)
 }
 
 # Function to list available backups
@@ -1645,6 +1662,33 @@ start_servers() {
         print_message $CYAN "Starting Worldserver in the second pane ($TMUX_SESSION_NAME:0.1)..." false
         tmux send-keys -t "$TMUX_SESSION_NAME:0.1" "cd '$server_bin_dir' && '$world_exec_path'" C-m
 
+        # Wait for Worldserver to be ready by checking its port
+        local WORLD_SERVER_PORT=8085 # Define Worldserver port
+        print_message $CYAN "Waiting for worldserver to be ready on port $WORLD_SERVER_PORT (max 60 seconds)..." false
+        local world_spinner_chars=('\' '|' '/' '-') # Local spinner for this wait
+        local world_ready=false
+        for i in {1..60}; do
+            # Use echo -ne to keep spinner on the same line
+            echo -ne "\r${CYAN}Checking port $WORLD_SERVER_PORT: attempt $i/60 ${world_spinner_chars[$((i % ${#world_spinner_chars[@]}))]} ${NC} "
+            if nc -z localhost $WORLD_SERVER_PORT &>/dev/null; then
+                world_ready=true
+                break
+            fi
+            sleep 1
+        done
+        echo -ne "\r${NC}                                                                          \r" # Clear spinner line
+
+        if [ "$world_ready" = false ]; then
+            print_message $RED "Worldserver did not start or become ready on port $WORLD_SERVER_PORT within 60 seconds." true
+            print_message $RED "Check TMUX session '$TMUX_SESSION_NAME' (pane '$WORLDSERVER_PANE_TITLE') for errors." true
+            # Note: Authserver is already running. The script will return 1, and the user might need to manually stop.
+            # Consider if TMUX session should be killed here if worldserver fails. For now, matching authserver failure behavior.
+            # tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Optionally kill session
+            return 1 # Indicate failure
+        else
+            print_message $GREEN "Worldserver appears to be ready." true
+        fi
+
         print_message $GREEN "Servers started in a split-pane layout in TMUX session '$TMUX_SESSION_NAME'." false
     fi
 
@@ -1700,15 +1744,41 @@ stop_servers() {
     if $world_pane_exists; then
         print_message $YELLOW "Sending graceful shutdown command ('$WORLDSERVER_CONSOLE_COMMAND_STOP') to Worldserver pane ($world_target_pane)..." false
         tmux send-keys -t "$world_target_pane" "$WORLDSERVER_CONSOLE_COMMAND_STOP" C-m
-        print_message $CYAN "Waiting a few seconds for Worldserver to process shutdown..." false
-        sleep 10 # Give time for graceful shutdown to initiate
+
+        # Wait for Worldserver to shut down by checking port 8085
+        local shutdown_timer=0
+        local max_shutdown_wait=300 # 300 seconds = 5 minutes
+        print_message $CYAN "Waiting for Worldserver (port 8085) to shut down (up to $max_shutdown_wait seconds)..." false
+        local spinner_chars="/-\\|"
+
+        while nc -z localhost 8085 &>/dev/null; do
+            shutdown_timer=$((shutdown_timer + 1))
+            if [ "$shutdown_timer" -gt "$max_shutdown_wait" ]; then
+                print_message $RED "Worldserver did not shut down within $max_shutdown_wait seconds. Proceeding with pane kill." true
+                break
+            fi
+            local char_index=$((shutdown_timer % ${#spinner_chars}))
+            echo -ne "\r${CYAN}Waiting... ${spinner_chars:$char_index:1} (Attempt: $shutdown_timer/$max_shutdown_wait)${NC}  "
+            sleep 1
+        done
+        echo -ne "\r${NC}                                                                          \r" # Clear spinner line
+
+        if ! nc -z localhost 8085 &>/dev/null; then
+            print_message $GREEN "Worldserver on port 8085 has shut down." false
+        fi
+
+        # Check if a post-shutdown delay is configured and positive
+        if [ -n "$POST_SHUTDOWN_DELAY_SECONDS" ] && [ "$POST_SHUTDOWN_DELAY_SECONDS" -gt 0 ]; then
+            print_message $CYAN "Waiting an additional ${POST_SHUTDOWN_DELAY_SECONDS}s for any final server processes to complete..." false
+            sleep "$POST_SHUTDOWN_DELAY_SECONDS"
+        fi
 
         # Re-check if pane 0.1 still exists after graceful shutdown attempt
         if tmux list-panes -t "$TMUX_SESSION_NAME:0" -F "#{pane_index}" | grep -q "^1$"; then
              print_message $YELLOW "Worldserver pane ($world_target_pane) still exists. Forcing closure." false
              tmux kill-pane -t "$world_target_pane" 2>/dev/null || print_message $RED "Failed to kill Worldserver pane $world_target_pane." false
         else
-            print_message $GREEN "Worldserver pane ($world_target_pane) closed (likely from graceful shutdown)." false
+            print_message $GREEN "Worldserver pane ($world_target_pane) closed (likely from graceful shutdown or port closure)." false
         fi
     else
         print_message $YELLOW "Worldserver pane ($world_target_pane) not found." false
@@ -1989,9 +2059,12 @@ run_command() {
 # Function to update a specific module by pulling the latest changes
 update_module() {
     local module_dir=$1
-    echo -e "${BLUE}Pulling the latest changes for $module_dir...${NC}"
-    run_command "git pull origin HEAD" "$module_dir"
-    echo -e "${GREEN}Successfully updated $module_dir.${NC}"
+    print_message $BLUE "Attempting to pull latest changes for module $(basename "$module_dir")..." false # Changed to print_message and basename
+    if run_command "git pull" "$module_dir"; then
+        print_message $GREEN "Successfully updated module $(basename "$module_dir")." false
+    else
+        print_message $RED "Failed to update module $(basename "$module_dir"). Please check output above for errors (e.g., merge conflicts, detached HEAD, network issues)." true
+    fi
 }
 
 # Function to check for updates in modules
