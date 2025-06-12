@@ -37,6 +37,7 @@ DEFAULT_AUTH_SERVER_LOG_FILENAME="authserver.log"
 DEFAULT_WORLD_SERVER_LOG_FILENAME="worldserver.log"
 DEFAULT_SCRIPT_LOG_DIR="$HOME/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
+DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_CORES_FOR_BUILD=""
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
@@ -59,6 +60,7 @@ WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confus
 # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
+POST_SHUTDOWN_DELAY_SECONDS=""
 CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
 
 # Function to check the Git status of the script's directory
@@ -239,6 +241,7 @@ load_config() {
     SCRIPT_LOG_DIR="${SCRIPT_LOG_DIR:-$DEFAULT_SCRIPT_LOG_DIR}" # This uses the SCRIPT_LOG_DIR var from config file
     SCRIPT_LOG_FILENAME="${SCRIPT_LOG_FILENAME:-$DEFAULT_SCRIPT_LOG_FILENAME}" # Uses SCRIPT_LOG_FILENAME from config
 
+    POST_SHUTDOWN_DELAY_SECONDS="${POST_SHUTDOWN_DELAY_SECONDS:-$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS}"
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
 
     # --- Update dynamic paths based on loaded/defaulted AZEROTHCORE_DIR ---
@@ -356,6 +359,10 @@ SCRIPT_LOG_FILENAME="$DEFAULT_SCRIPT_LOG_FILENAME"
 # Number of CPU cores to use for building AzerothCore
 # Leave empty or set to a number (e.g., 4). If empty, script will ask or use all available.
 CORES_FOR_BUILD="$DEFAULT_CORES_FOR_BUILD"
+
+# Number of seconds to wait after port 8085 is free before force-closing server panes.
+# This allows extra time for database writes or other cleanup tasks.
+POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
 
 EOF
     if [ $? -eq 0 ]; then
@@ -1721,6 +1728,12 @@ stop_servers() {
 
         if ! nc -z localhost 8085 &>/dev/null; then
             print_message $GREEN "Worldserver on port 8085 has shut down." false
+        fi
+
+        # Check if a post-shutdown delay is configured and positive
+        if [ -n "$POST_SHUTDOWN_DELAY_SECONDS" ] && [ "$POST_SHUTDOWN_DELAY_SECONDS" -gt 0 ]; then
+            print_message $CYAN "Waiting an additional ${POST_SHUTDOWN_DELAY_SECONDS}s for any final server processes to complete..." false
+            sleep "$POST_SHUTDOWN_DELAY_SECONDS"
         fi
 
         # Re-check if pane 0.1 still exists after graceful shutdown attempt
