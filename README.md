@@ -1,33 +1,40 @@
 # AzerothCore Rebuild/Update Script
 
-This script is designed to help you **update**, **build**, **run**, and **manage** your **AzerothCore** server — a popular server emulator for **World of Warcraft**. It simplifies common tasks such as updating the source code, managing dependencies, rebuilding the server, handling server processes, managing backups, viewing logs, and configuring operational parameters via an external file.
+This script is designed to help you **update**, **build**, **run**, and **manage** your **AzerothCore** server — a popular server emulator for **World of Warcraft**. It provides a simple, menu-driven interface to handle the most common server administration tasks.
 
-The script is now highly modular and supports both traditional and **Docker-based** AzerothCore setups.
+The script supports both traditional (local) and **Docker-based** AzerothCore setups.
 
 ---
 
-## Features:
-- **Docker Support**: Automatically detects if your AzerothCore installation is managed by Docker and adapts its functionality to use `docker compose` for server management, backups, and logging.
-- **Modular and Maintainable Code**: The script is now broken down into a `lib/` directory with multiple files, making it easier to maintain, debug, and contribute to.
-- **Expanded Dependency Check**: Automatically checks for essential software and supports multiple package managers, including `apt` (Debian/Ubuntu), `yum` (CentOS/RHEL), `pacman` (Arch Linux), and `brew` (macOS).
-- **Flexible Editor Choice**: Respects your `$EDITOR` environment variable for editing configuration files, falling back to `nano`, `vi`, or `ed` if it's not set.
-- **Source Code Update**: Allows you to update your existing AzerothCore server's source code from its Git repository.
-- **Rebuilding the Server**: Uses `cmake` and `make` to rebuild and reinstall the updated AzerothCore server, with an option to specify the number of CPU cores for faster builds.
-- **Safety Check**: Prompts the user to stop running servers before a rebuild operation to prevent conflicts and ensure a clean build process.
-- **Process Management**: Advanced control over server processes, including starting, stopping,restarting, and checking the status of `authserver` and `worldserver` within their TMUX session (for traditional setups) or Docker containers.
-- **Backup and Restore**: Easily backup your server's databases (world, characters, auth) and server configuration files (`worldserver.conf`, `authserver.conf`). Restore from existing backups.
-- **Backup Dry Run**: A "Dry Run" option for backups allows you to see what the backup process will do without actually performing it.
-- **Log Viewer**: View script operation logs, as well as live (`tail -f`) or static (`less`) `authserver` and `worldserver` logs directly through the script.
-- **Module Management**: Helps you to update all or individual custom modules located in your `modules` directory.
-- **External Configuration**: Persistent settings via an external configuration file (`~/.ACrebuild/ACrebuild.conf`), making it easy to customize paths, credentials (with caution for passwords), and other operational parameters.
-- **Flexible Menu System**: Interactive menus guide you through various operations.
-- **Self-Update Capability**: The script can update itself to the latest version from its Git repository.
+## Features
+
+#### Core Functionality
+- **Update Source Code**: Pulls the latest changes for your AzerothCore source code from its Git repository.
+- **Rebuild Server**: Manages the `cmake` and `make` process to rebuild and reinstall the server.
+- **Process Management**: Start, stop, restart, and check the status of `authserver` and `worldserver`. Supports both traditional TMUX sessions and Docker containers.
+- **Update Modules**: Recursively runs `git pull` on all directories inside your `modules` folder to keep them up-to-date.
+
+#### Setup & Configuration
+- **Configurable Docker Support**: Easily manage Docker-based setups by enabling Docker Mode.
+- **Smart Docker Prompt**: On first run, the script can detect a potential Docker setup and will ask if you want to enable Docker Mode automatically.
+- **External Configuration File**: All settings are stored in `~/.ACrebuild/ACrebuild.conf` for easy persistence.
+- **Flexible Editor Choice**: Respects your `$EDITOR` environment variable for editing configuration files, falling back to `nano`, `vi`, or `ed`.
+
+#### Utilities & Safeguards
+- **Dependency Check**: Automatically checks for essential software. If Docker mode is enabled, it will also check for the `docker` command.
+- **Backup and Restore**: Create comprehensive backups of your server's databases (world, characters, auth) and configuration files.
+- **Backup Dry Run**: See what a backup will do without actually creating any files.
+- **Log Viewer**: View the script's own logs, or live-tail the `authserver` and `worldserver` logs.
+- **Pre-build Safety Check**: Prompts you to stop running servers before a rebuild to prevent conflicts.
+
+#### Script Maintenance
+- **Self-Update**: The script can update itself to the latest version from its own Git repository.
 
 ---
 
 ## Installation
 
-1.  **Clone the repository** (or download the script) to your local machine:
+1.  **Clone the repository** to your local machine:
     ```bash
     git clone https://github.com/Stuntmonkey4u/ACrebuild.git
     cd ACrebuild
@@ -37,36 +44,33 @@ The script is now highly modular and supports both traditional and **Docker-base
     ```bash
     ./ACrebuild.sh
     ```
-    The script will guide you through initial setup, including the location of your AzerothCore installation if it's not in the default path (`~/azerothcore`).
+    The script will guide you through the initial setup.
 
 ---
 
 ## How It Works
 
-When you run `ACrebuild.sh`, it presents an interactive main menu with several categories:
+The script provides an interactive, menu-driven interface for all its features. When you first run the script, it will help you configure the path to your AzerothCore installation.
 
--   **Server Operations**: Options to update source code, manage custom modules, and perform server rebuilds (with an option to also run the server post-rebuild). Server starting is also handled under "Process Management".
--   **Server Management**:
-    -   **Process Management**: Control starting, stopping, and restarting `authserver` and `worldserver`. Check their status.
-    -   **Backup/Restore Options**: Create new backups of your databases and server configurations, or restore from a previously created backup. Includes a "Dry Run" option.
-    -   **Log Viewer**: Access and view logs generated by the script itself, `authserver`, or `worldserver`.
--   **Script Maintenance & Exit**:
-    -   **Self-Update ACrebuild Script**: If the script was cloned from its Git repository, this option allows it to fetch and apply the latest updates to itself.
-    -   **Configuration Options**: Manage the script's settings. You can view the current configuration, edit the configuration file directly, or reset all settings to their defaults.
-    -   **Quit Script**: Exits the `ACrebuild.sh` script.
+### Docker Mode
 
-### Docker Support
+The script can manage both traditional and Docker-based server installations. Docker mode is controlled by a setting in the configuration file (`~/.ACrebuild/ACrebuild.conf`).
 
-The script automatically detects if your `AZEROTHCORE_DIR` contains a `docker-compose.yml` file. If it does, the script enters "Docker Mode" and adapts its functionality:
--   **Server Management**: Instead of using TMUX, the script uses `docker compose` to start, stop, and restart the `ac-worldserver` and `ac-authserver` services.
--   **Backups**: Database backups are performed by executing `mysqldump` inside the `ac-db` container.
--   **Log Viewing**: Logs are viewed using `docker compose logs`.
+**Enabling Docker Mode:**
+There are two ways to enable it:
 
-This allows you to manage both traditional and Docker-based AzerothCore installations with the same script and interface.
+1.  **Automatic Prompt (Recommended):** On first run, if the script detects a `docker-compose.yml` file and the `docker` command, it will ask if you want to enable Docker Mode. If you agree, it will automatically update your configuration file.
+
+2.  **Manual Toggle:** You can enable or disable Docker Mode at any time from the **"Configuration Options"** menu.
+
+When Docker Mode is enabled, the script adapts its functionality to use `docker compose` for all server management, backup, and logging tasks.
+
+---
+
+## For Developers & Contributors
 
 ### Code Structure
-
-The script has been refactored for better maintainability. The core logic is now located in the `lib/` directory, with each file responsible for a specific feature:
+This script has been refactored for better maintainability. The core logic is now located in the `lib/` directory, with each file responsible for a specific feature:
 -   `core.sh`: Core functions, shared variables, and error handling.
 -   `config.sh`: Configuration management.
 -   `dependencies.sh`: Dependency checking.
@@ -78,44 +82,17 @@ The script has been refactored for better maintainability. The core logic is now
 
 The main `ACrebuild.sh` script is now primarily an entry point that sources these libraries and runs the main application loop.
 
----
-
-## Configuration
-
-The `ACrebuild.sh` script uses an external configuration file located at:
-`~/.ACrebuild/ACrebuild.conf`
-
-This file is automatically created with default values when you first run the script or if it's missing. You can manage this configuration through the **"Configuration Options"** menu within the script.
-
-Key settings you can configure include:
-
--   `AZEROTHCORE_DIR`: The path to your AzerothCore installation.
--   `BACKUP_DIR`: The directory where backups will be stored.
--   `DB_USER`, `DB_PASS` (use with caution, leave empty to be prompted), `AUTH_DB_NAME`, `CHAR_DB_NAME`, `WORLD_DB_NAME`: Database connection details for backups and restores.
--   Paths for server configuration and log directories (usually relative to `AZEROTHCORE_DIR`).
--   Filenames for server and script logs.
--   `CORES_FOR_BUILD`: Number of CPU cores to use during the `make` process for faster compilation.
-
-It's recommended to manage these settings via the script's menu, especially for paths, to ensure they are correctly formatted. For sensitive information like `DB_PASS`, the script will always prompt you if it's empty in the configuration file, which is the recommended approach for security.
+### Contributing
+If you have an improvement or idea, please make a pull request!
 
 ---
 
 ## License
 
-This script is licensed under the **MIT License**. Feel free to modify and use it as needed.
+This script is licensed under the **MIT License**.
 
 ---
 
 ## Disclaimer
 
 This script is provided as-is, with no warranties or guarantees. Use at your own risk. Make sure to backup your server data before running any script that modifies or updates your environment.
-
----
-
-## Contributors (So Far...)
-
-Created by Stuntmonkey4u
-
-## Pull Request
-
-If you have an improvement or idea, make a pull request, get your name added to the Contributors list!!
