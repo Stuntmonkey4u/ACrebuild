@@ -71,19 +71,23 @@ When Docker Mode is enabled, the script adapts its functionality to use `docker 
 
 ### Code Structure
 This script has been refactored for better maintainability. The core logic is now located in the `lib/` directory, with each file responsible for a specific feature:
--   `core.sh`: Core functions, shared variables, and error handling.
+-   `core.sh`: Core functions and error handling.
 -   `config.sh`: Configuration management.
 -   `dependencies.sh`: Dependency checking.
 -   `update.sh`: Script and module updating.
 -   `server.sh`: Server process management.
 -   `backup.sh`: Backup and restore functionality.
 -   `logging.sh`: Log viewing.
+-   `variables.sh`: Core functions, shared variables, and error handling.
 -   `ui.sh`: All user interface elements (menus, messages).
 
 The main `ACrebuild.sh` script is now primarily an entry point that sources these libraries and runs the main application loop.
 
 ### Contributing
 If you have an improvement or idea, please make a pull request!
+
+## Contributors (So Far)
+Created by Stuntmonkey4u
 
 ---
 
