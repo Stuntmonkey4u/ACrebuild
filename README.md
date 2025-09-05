@@ -86,7 +86,7 @@ The main `ACrebuild.sh` script is now primarily an entry point that sources thes
 ### Contributing
 If you have an improvement or idea, please make a pull request!
 
-## Contributors (So Far)
+### Contributors (So Far)
 Created by Stuntmonkey4u
 
 ---
