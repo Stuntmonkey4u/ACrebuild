@@ -34,6 +34,7 @@ DEFAULT_SCRIPT_LOG_DIR="$HOME/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
 DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_CORES_FOR_BUILD=""
+DEFAULT_USE_DOCKER=false
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
 AZEROTHCORE_DIR=""
@@ -58,6 +59,7 @@ ERROR_LOG_FILENAME=""
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
 POST_SHUTDOWN_DELAY_SECONDS=""
 CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
+USE_DOCKER=""
 
 # Runtime flags for controlling the main loop
 BUILD_ONLY=false

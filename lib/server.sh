@@ -1,7 +1,7 @@
 #!/bin/bash
 
 is_docker_setup() {
-    [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ]
+    [ "$USE_DOCKER" = true ]
 }
 
 start_servers() {

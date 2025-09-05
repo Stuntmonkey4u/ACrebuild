@@ -49,6 +49,7 @@ load_config() {
 
     POST_SHUTDOWN_DELAY_SECONDS="${POST_SHUTDOWN_DELAY_SECONDS:-$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS}"
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
+    USE_DOCKER="${USE_DOCKER:-$DEFAULT_USE_DOCKER}"
 
     # --- Update dynamic paths based on loaded/defaulted AZEROTHCORE_DIR ---
     BUILD_DIR="$AZEROTHCORE_DIR/build"
@@ -174,6 +175,9 @@ CORES_FOR_BUILD="$DEFAULT_CORES_FOR_BUILD"
 # This allows extra time for database writes or other cleanup tasks.
 POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
 
+# Set to 'true' to enable Docker mode, 'false' otherwise.
+# If this is true, the script will use 'docker compose' for server management.
+USE_DOCKER="$DEFAULT_USE_DOCKER"
 EOF
     if [ $? -eq 0 ]; then
         print_message $GREEN "Default configuration file created successfully." true

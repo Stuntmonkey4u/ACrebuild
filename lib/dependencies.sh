@@ -16,6 +16,14 @@ check_dependencies() {
         fi
     done
 
+    # Conditionally check for Docker if it's a Docker-based setup
+    if is_docker_setup; then
+        if ! command -v docker &> /dev/null; then
+            print_message $RED "docker is not installed. This is required for your Docker-based setup." false
+            MISSING_DEPENDENCIES+=("docker")
+        fi
+    fi
+
     # If there are missing dependencies, prompt the user to install them
     if [ ${#MISSING_DEPENDENCIES[@]} -gt 0 ]; then
         ask_to_install_dependencies
@@ -64,6 +72,7 @@ install_dependencies() {
             dep_map["clang++"]="clang"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat-openbsd"
+            dep_map["docker"]="docker.io" # Use docker.io for simplicity
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -89,6 +98,7 @@ install_dependencies() {
             dep_map["clang"]="clang"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="nmap-ncat" # Provides nc
+            dep_map["docker"]="docker"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -117,6 +127,7 @@ install_dependencies() {
             dep_map["clang"]="clang"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="openbsd-netcat"
+            dep_map["docker"]="docker"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -144,6 +155,7 @@ install_dependencies() {
             dep_map["clang++"]="llvm"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat"
+            dep_map["docker"]="docker"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do

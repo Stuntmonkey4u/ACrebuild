@@ -31,6 +31,9 @@ main_menu() {
     # Ask for core installation path (which now uses/updates config)
     ask_for_core_installation_path
 
+    # Check for potential docker setup and prompt user if needed
+    check_and_prompt_for_docker_usage
+
     # Show the menu in a loop
     while true; do
         show_menu

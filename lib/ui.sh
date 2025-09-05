@@ -26,7 +26,7 @@ show_menu() {
     print_message $BLUE "================== MAIN MENU ==================" true
     # Docker mode indicator
     if is_docker_setup; then
-        print_message $CYAN "       ✨ Docker Mode Active ✨" true
+        print_message $CYAN "     ✨ Docker Setup Detected ✨" true
     fi
     echo ""
     print_message $YELLOW "Select an option:" true
@@ -51,6 +51,35 @@ show_menu() {
     print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false # Renumbered from [8]
     echo ""
     print_message $BLUE "-----------------------------------------------" true
+}
+
+# Function to check for a potential Docker setup and prompt the user to enable it.
+# This should only run once on startup if the conditions are met.
+check_and_prompt_for_docker_usage() {
+    # Conditions to check:
+    # 1. A docker-compose.yml file exists in the AzerothCore directory.
+    # 2. The 'docker' command is available on the system.
+    # 3. The USE_DOCKER flag is currently false.
+    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ] && command -v docker &> /dev/null && [ "$USE_DOCKER" = false ]; then
+        echo ""
+        print_message $BLUE "------------------- Docker Setup Detected --------------------" true
+        print_message $YELLOW "We've detected a 'docker-compose.yml' file and the 'docker' command." false
+        print_message $YELLOW "It looks like you might be running a Docker-based setup." false
+        print_message $CYAN "The script is currently in non-Docker mode." false
+        print_message $YELLOW "Would you like to enable Docker Mode now? (y/n)" true
+        read -r docker_choice
+        if [[ "$docker_choice" =~ ^[Yy]$ ]]; then
+            print_message $GREEN "Enabling Docker Mode and saving to configuration..." true
+            save_config_value "USE_DOCKER" "true"
+            # Reload config to ensure the change is active for the current session
+            load_config
+        else
+            print_message $CYAN "Keeping Docker Mode disabled for this session." false
+            print_message $CYAN "You can enable it later in the Configuration Options menu." false
+        fi
+        print_message $BLUE "------------------------------------------------------------" true
+        echo ""
+    fi
 }
 
 # Function to display current configuration
@@ -95,12 +124,19 @@ show_config_management_menu() {
     echo ""
     print_message $BLUE "=========== CONFIGURATION MANAGEMENT MENU ============" true
     echo ""
+    local docker_status_msg="DISABLED"
+    if [ "$USE_DOCKER" = true ]; then
+        docker_status_msg="ENABLED"
+    fi
+    print_message $CYAN "Docker Mode is currently: $docker_status_msg" false
+    echo ""
     print_message $YELLOW "Select an option:" true
     echo ""
     print_message $YELLOW "  [1] View Current Configuration" false
     print_message $YELLOW "  [2] Edit Configuration File ($CONFIG_FILE)" false
-    print_message $YELLOW "  [3] Reset Configuration to Defaults" false
-    print_message $YELLOW "  [4] Return to Main Menu" false
+    print_message $YELLOW "  [3] Toggle Docker Mode" false
+    print_message $YELLOW "  [4] Reset Configuration to Defaults" false
+    print_message $YELLOW "  [5] Return to Main Menu" false
     echo ""
     print_message $BLUE "----------------------------------------------------" true
     handle_config_management_choice
@@ -109,7 +145,7 @@ show_config_management_menu() {
 # Function to handle configuration management menu choices
 handle_config_management_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" config_choice
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" config_choice
     case $config_choice in
         1)
             show_current_configuration
@@ -136,6 +172,19 @@ handle_config_management_choice() {
             load_config # Reload config after editing
             ;;
         3)
+            local new_docker_mode
+            if [ "$USE_DOCKER" = true ]; then
+                new_docker_mode=false
+                print_message $GREEN "Disabling Docker Mode." false
+            else
+                new_docker_mode=true
+                print_message $GREEN "Enabling Docker Mode." false
+            fi
+            save_config_value "USE_DOCKER" "$new_docker_mode"
+            # Reload config to make the change active immediately
+            load_config
+            ;;
+        4)
             print_message $RED "${BOLD}WARNING: This will delete your current configuration file and reset all settings to default.${NC}" true
             print_message $YELLOW "Are you sure you want to proceed? (y/n)" true
             read -r confirm_reset
@@ -154,16 +203,16 @@ handle_config_management_choice() {
                 print_message $GREEN "Configuration reset aborted." false
             fi
             ;;
-        4)
+        5)
             print_message $GREEN "Returning to Main Menu..." false
             return
             ;;
         *)
-            print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
             ;;
     esac
     # After an action, explicitly call show_config_management_menu again
-    if [[ "$config_choice" != "4" ]]; then
+    if [[ "$config_choice" != "5" ]]; then
         # Adding a small pause and clear before showing the menu again for better UX
         read -n 1 -s -r -p "Press any key to return to Configuration Management menu..."
         clear
