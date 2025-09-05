@@ -58,3 +58,7 @@ ERROR_LOG_FILENAME=""
 SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
 POST_SHUTDOWN_DELAY_SECONDS=""
 CORES="" # Runtime variable, takes its value from CORES_FOR_BUILD in config.
+
+# Runtime flags for controlling the main loop
+BUILD_ONLY=false
+RUN_SERVER=false
