@@ -153,7 +153,8 @@ handle_config_management_choice() {
         2)
             print_message $CYAN "Attempting to open $CONFIG_FILE for editing..." false
             # Prioritize $EDITOR variable if it is set and points to an executable command
-            if [ -n "$EDITOR" ] && command -v "$EDITOR" &> /dev/null; then
+            # Use ${EDITOR-} to avoid unbound variable error if 'set -u' is active
+            if [ -n "${EDITOR-}" ] && command -v "$EDITOR" &> /dev/null; then
                 print_message $CYAN "Using editor from \$EDITOR environment variable: $EDITOR" false
                 "$EDITOR" "$CONFIG_FILE"
             elif command -v nano &> /dev/null; then
