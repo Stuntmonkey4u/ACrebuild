@@ -146,7 +146,7 @@ show_config_management_menu() {
 handle_config_management_choice() {
     echo ""
     read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" config_choice
-    case $config_choice in
+    case "$config_choice" in
         1)
             show_current_configuration
             ;;
@@ -192,7 +192,7 @@ handle_config_management_choice() {
             if [[ "$confirm_reset" =~ ^[Yy]$ ]]; then
                 print_message $CYAN "Deleting $CONFIG_FILE..." false
                 rm -f "$CONFIG_FILE"
-                if [ $? -eq 0 ]; then
+                if [ "$?" -eq 0 ]; then
                     print_message $GREEN "Configuration file deleted." false
                 else
                     print_message $RED "Error deleting configuration file. Check permissions." true
@@ -276,7 +276,7 @@ show_process_management_menu() {
 handle_process_management_choice() {
     echo ""
     read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" proc_choice
-    case $proc_choice in
+    case "$proc_choice" in
         1)
             start_servers
             ;;
@@ -310,7 +310,7 @@ handle_process_management_choice() {
 handle_log_viewer_choice() {
     echo ""
     read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice # Updated prompt
-    case $log_choice in
+    case "$log_choice" in
         1) view_script_log ;;
         2) view_auth_log ;;
         3) view_world_log ;;
@@ -333,7 +333,7 @@ handle_log_viewer_choice() {
 handle_backup_restore_choice() {
     echo ""
     read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_choice
-    case $backup_choice in
+    case "$backup_choice" in
         1)
             create_backup
             ;;
@@ -366,7 +366,7 @@ handle_backup_restore_choice() {
 handle_menu_choice() {
     echo ""
     read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, A, Q, or 1-9]: ${NC}")" choice # Prompt updated
-    case $choice in
+    case "$choice" in
         1|[Rr]) # [1] Rebuild and Run Server
             RUN_SERVER=true
             BUILD_ONLY=true

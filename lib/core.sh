@@ -63,12 +63,20 @@ get_package_manager() {
 
 # Function to run a command and capture its output
 run_command() {
-    local command=$1
-    local cwd=$2
+    local command_str="$1"
+    local cwd="$2"
+
+    # Split the command string into an array to handle arguments safely.
+    # This avoids using 'eval', which can be a security risk.
+    local -a cmd_parts
+    read -r -a cmd_parts <<< "$command_str"
+
+    # Execute the command.
+    # The subshell with 'cd' ensures we don't change the script's main directory.
     if [ -z "$cwd" ]; then
-        eval "$command"
+        "${cmd_parts[@]}"
     else
-        (cd "$cwd" && eval "$command")
+        (cd "$cwd" && "${cmd_parts[@]}")
     fi
 }
 
@@ -124,7 +132,7 @@ handle_error() {
         run_countdown_timer 900 # Call the countdown function (900 seconds = 15 minutes)
         local countdown_result=$?
 
-        if [ $countdown_result -eq 0 ]; then # User chose 'yes' or timed out
+        if [ "$countdown_result" -eq 0 ]; then # User chose 'yes' or timed out
             print_message $GREEN "Running 'make clean'..." true
             if [ -d "$BUILD_DIR" ]; then
                 (cd "$BUILD_DIR" && make clean) || print_message $RED "Warning: 'make clean' encountered an error, but attempting rebuild anyway." false
@@ -135,7 +143,7 @@ handle_error() {
             build_and_install_with_spinner
             print_message $GREEN "Rebuild process finished." true
             exit 0
-        elif [ $countdown_result -eq 1 ]; then # User chose 'no'
+        elif [ "$countdown_result" -eq 1 ]; then # User chose 'no'
             print_message $RED "Skipping 'make clean'. Exiting." true
             print_message $RED "--------------------------------------------------------------------" true
             exit 1

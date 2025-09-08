@@ -356,7 +356,7 @@ update_modules() {
                     break # Break from specific module selection, back to A/S/Q
                 fi
 
-                if [ "$specific_choice" -ge 1 ] && [ "$specific_choice" -le ${#modules_with_updates[@]} ]; then
+                if [ "$specific_choice" -ge 1 ] && [ "$specific_choice" -le "${#modules_with_updates[@]}" ]; then
                     module_index=$((specific_choice-1))
                     module_path_to_update=${modules_with_updates[$module_index]}
                     print_message $YELLOW "Are you sure you want to update $(basename "$module_path_to_update")? (y/n)" true

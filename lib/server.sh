@@ -261,7 +261,7 @@ restart_servers() {
         print_message $BLUE "--- Attempting to Restart AzerothCore Servers (TMUX) ---" true
         stop_servers
         local stop_status=$?
-        if [ $stop_status -ne 0 ]; then
+        if [ "$stop_status" -ne 0 ]; then
             print_message $RED "Server stop phase failed. Aborting restart." true
             return 1
         fi
@@ -271,10 +271,10 @@ restart_servers() {
 
         start_servers
         local start_status=$?
-        if [ $start_status -ne 0 ] && [ $start_status -ne 2 ]; then # 2 means already running, which is odd here but not a failure to start
+        if [ "$start_status" -ne 0 ] && [ "$start_status" -ne 2 ]; then # 2 means already running, which is odd here but not a failure to start
             print_message $RED "Server start phase failed. Please check messages." true
             return 1
-        elif [ $start_status -eq 2 ]; then
+        elif [ "$start_status" -eq 2 ]; then
              print_message $YELLOW "Servers reported as already running during start phase. This is unexpected after a stop. Please check status." true
         fi
 
@@ -456,7 +456,7 @@ ask_for_update_confirmation() {
             # Step 3b: Re-check ports to confirm successful shutdown
             if nc -z localhost 3724 &>/dev/null || nc -z localhost 8085 &>/dev/null; then
                 # This condition means either stop_servers() didn't effectively stop them, or they restarted quickly.
-                print_message $RED "Failed to stop servers (ports still active after stop attempt; stop_servers status: $stop_result)." true
+                print_message $RED "Failed to stop servers (ports still active after stop attempt; stop_servers status: \"$stop_result\")." true
                 print_message $RED "Rebuild aborted to prevent issues. Please stop servers manually via Process Management." true
                 return 1 # Abort build
             else

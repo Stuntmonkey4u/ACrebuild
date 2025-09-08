@@ -10,7 +10,7 @@ check_dependencies() {
     DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc") # Added nc for netcat
     for DEP in "${DEPENDENCIES[@]}"; do
         command -v "$DEP" &>/dev/null
-        if [ $? -ne 0 ]; then
+        if [ "$?" -ne 0 ]; then
             print_message $RED "$DEP is not installed. Please install it before continuing." false
             MISSING_DEPENDENCIES+=("$DEP")
         fi
@@ -84,7 +84,7 @@ install_dependencies() {
             packages_to_install=($(printf "%s\n" "${packages_to_install[@]}" | sort -u))
 
             if [ ${#packages_to_install[@]} -gt 0 ]; then
-                sudo apt install -y "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using apt. Please install them manually." true; }
+                sudo apt install -y "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using apt. Please install them manually." true; exit 1; }
             fi
             ;;
         "yum")
@@ -112,7 +112,7 @@ install_dependencies() {
             packages_to_install=($(printf "%s\n" "${packages_to_install[@]}" | sort -u))
 
             if [ ${#packages_to_install[@]} -gt 0 ]; then
-                sudo yum install -y "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using yum. Please install them manually." true; }
+                sudo yum install -y "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using yum. Please install them manually." true; exit 1; }
             fi
             ;;
         "pacman")
@@ -140,7 +140,7 @@ install_dependencies() {
             packages_to_install=($(printf "%s\n" "${packages_to_install[@]}" | sort -u))
 
             if [ ${#packages_to_install[@]} -gt 0 ]; then
-                sudo pacman -S --noconfirm --needed "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using pacman. Please install them manually." true; }
+                sudo pacman -S --noconfirm --needed "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using pacman. Please install them manually." true; exit 1; }
             fi
             ;;
         "brew")
@@ -166,7 +166,7 @@ install_dependencies() {
             packages_to_install=($(printf "%s\n" "${packages_to_install[@]}" | sort -u))
 
             if [ ${#packages_to_install[@]} -gt 0 ]; then
-                brew install "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using brew. Please install them manually." true; }
+                brew install "${packages_to_install[@]}" || { print_message $RED "Error: Failed to install packages using brew. Please install them manually." true; exit 1; }
             fi
             ;;
         "unsupported")
