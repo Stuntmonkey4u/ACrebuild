@@ -66,18 +66,8 @@ check_for_script_updates() {
         return
     fi
 
-    # Determine the default branch of the 'origin' remote (e.g., main, master)
-    # This requires SCRIPT_DIR_PATH to be set, which is done in check_script_git_status
-    DEFAULT_BRANCH=$(git -C "$SCRIPT_DIR_PATH" remote show origin 2>/dev/null | grep 'HEAD branch' | awk '{print $NF}')
-
-    # If the default branch could not be determined (e.g., remote misconfiguration, or grep/awk failed),
-    # then we cannot compare. Silently exit.
-    if [ -z "$DEFAULT_BRANCH" ]; then
-        return
-    fi
-
-    # Get the commit hash of the remote-tracking branch (e.g., refs/remotes/origin/main)
-    REMOTE_HEAD=$(git -C "$SCRIPT_DIR_PATH" rev-parse "origin/$DEFAULT_BRANCH" 2>/dev/null)
+    # Get the commit hash of the remote's default branch using the 'origin/HEAD' symbolic ref.
+    REMOTE_HEAD=$(git -C "$SCRIPT_DIR_PATH" rev-parse "origin/HEAD" 2>/dev/null)
     # If REMOTE_HEAD could not be determined (e.g., default branch deleted from remote, or never fetched),
     # silently exit.
     if [ -z "$REMOTE_HEAD" ]; then
