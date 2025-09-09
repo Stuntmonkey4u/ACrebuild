@@ -77,6 +77,13 @@ view_world_log() {
 
 view_error_log() {
     print_message $CYAN "Accessing server error log..." false
-    local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
-    view_log_file "$full_error_log_path" true # true means prompt for view mode (less/tail)
+    if is_docker_setup; then
+        print_message $YELLOW "In Docker mode, server errors are typically shown in the main container logs." true
+        print_message $YELLOW "Please check the logs for 'ac-authserver' or 'ac-worldserver' instead." true
+        read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
+        echo ""
+    else
+        local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
+        view_log_file "$full_error_log_path" true # true means prompt for view mode (less/tail)
+    fi
 }

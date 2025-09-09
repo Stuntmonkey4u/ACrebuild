@@ -185,10 +185,28 @@ restore_backup() {
         echo ""
     fi
 
+    # Add a pre-restore backup prompt for safety
+    echo ""
+    print_message $YELLOW "It is recommended to back up your current databases before restoring." true
+    print_message $YELLOW "Would you like to create a backup of your current state now? (y/n)" true
+    read -r backup_first_choice
+    if [[ "$backup_first_choice" =~ ^[Yy]$ ]]; then
+        print_message $BLUE "--- Starting Pre-Restore Backup ---" true
+        create_backup
+        if [ $? -ne 0 ]; then
+            print_message $RED "Pre-restore backup failed. Aborting restore process to ensure safety." true
+            return 1
+        fi
+        print_message $GREEN "--- Pre-Restore Backup Completed ---" true
+    else
+        print_message $CYAN "Skipping pre-restore backup." false
+    fi
+
+    echo ""
     print_message $RED "WARNING: This will overwrite your current databases and configuration files." true
-    print_message $YELLOW "Are you sure you want to continue? (y/n)" true
+    print_message $YELLOW "Are you absolutely sure you want to continue with the restore? (y/n)" true
     read -r confirmation
-    [[ ! "$confirmation" =~ ^[Yy]$ ]] && { print_message $GREEN "Restore aborted." true; return 1; }
+    [[ ! "$confirmation" =~ ^[Yy]$ ]] && { print_message $GREEN "Restore aborted by user." true; return 1; }
 
     TEMP_RESTORE_DIR="$BACKUP_DIR/restore_temp_$(date +"%Y%m%d_%H%M%S")"
     mkdir -p "$TEMP_RESTORE_DIR" || { print_message $RED "Failed to create temp directory." true; return 1; }

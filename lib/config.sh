@@ -51,6 +51,10 @@ load_config() {
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
     USE_DOCKER="${USE_DOCKER:-$DEFAULT_USE_DOCKER}"
 
+    # --- Assign non-user-configurable variables from defaults ---
+    AUTH_PORT="${DEFAULT_AUTH_PORT}"
+    WORLD_PORT="${DEFAULT_WORLD_PORT}"
+
     # --- Update dynamic paths based on loaded/defaulted AZEROTHCORE_DIR ---
     BUILD_DIR="$AZEROTHCORE_DIR/build"
     SERVER_CONFIG_DIR_PATH="$AZEROTHCORE_DIR/$server_config_suffix"
