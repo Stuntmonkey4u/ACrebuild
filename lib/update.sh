@@ -3,36 +3,46 @@
 # Function to check the Git status of the script's directory
 check_script_git_status() {
     print_message $BLUE "Checking script's Git repository status..." true
-    # Determine the absolute directory path of the script
-    # Updated method for reliability, especially with symlinks or sourcing
-    CURRENT_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-    SCRIPT_DIR_PATH="$CURRENT_SCRIPT_DIR"
+    # Determine the directory of the sourced script first
+    local sourced_script_dir
+    sourced_script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-    print_message $CYAN "Script is running from: $SCRIPT_DIR_PATH" false
+    # Attempt to find the top-level directory of the Git repository
+    local repo_root
+    repo_root=$(git -C "$sourced_script_dir" rev-parse --show-toplevel 2>/dev/null)
 
-    if [ -d "$SCRIPT_DIR_PATH/.git" ]; then
-        print_message $GREEN "  .git directory found." false
-        # Confirm it's part of a Git working tree
-        if git -C "$SCRIPT_DIR_PATH" rev-parse --is-inside-work-tree &>/dev/null; then
-            print_message $GREEN "  Script directory is part of a Git working tree." false
-            # Check if 'origin' remote is configured
-            if git -C "$SCRIPT_DIR_PATH" remote get-url origin &>/dev/null; then
-                print_message $GREEN "  'origin' remote is configured for the script's repository." false
-                SCRIPT_IS_GIT_REPO=true
-                print_message $GREEN "Script is confirmed to be in a Git repository with an 'origin' remote." true
-            else
-                SCRIPT_IS_GIT_REPO=false
-                print_message $YELLOW "  'origin' remote is NOT configured for the script's repository." false
-                print_message $YELLOW "Script is in a Git repository, but 'origin' remote is missing." true
-            fi
+    if [ -z "$repo_root" ]; then
+        SCRIPT_IS_GIT_REPO=false
+        # Fallback to the sourced script dir for path context, even though it's not a git repo.
+        SCRIPT_DIR_PATH="$sourced_script_dir"
+        print_message $YELLOW "Could not determine the script's repository root. Not a git repo or git is not installed." true
+        return
+    fi
+
+    SCRIPT_DIR_PATH="$repo_root"
+    print_message $CYAN "Script repository root found at: $SCRIPT_DIR_PATH" false
+
+    # Now that we have the repo root, we can perform the checks.
+    # The .git directory check is implicitly handled by the success of `rev-parse --show-toplevel`.
+    print_message $GREEN "  .git directory found." false
+
+    # Confirm it's part of a Git working tree (somewhat redundant, but good for sanity check)
+    if git -C "$SCRIPT_DIR_PATH" rev-parse --is-inside-work-tree &>/dev/null; then
+        print_message $GREEN "  Script directory is part of a Git working tree." false
+        # Check if 'origin' remote is configured
+        if git -C "$SCRIPT_DIR_PATH" remote get-url origin &>/dev/null; then
+            print_message $GREEN "  'origin' remote is configured for the script's repository." false
+            SCRIPT_IS_GIT_REPO=true
+            print_message $GREEN "Script is confirmed to be in a Git repository with an 'origin' remote." true
         else
             SCRIPT_IS_GIT_REPO=false
-            print_message $YELLOW "  Script directory is NOT part of a Git working tree (rev-parse check failed)." false
+            print_message $YELLOW "  'origin' remote is NOT configured for the script's repository." false
+            print_message $YELLOW "Script is in a Git repository, but 'origin' remote is missing." true
         fi
     else
+        # This case is unlikely if `rev-parse --show-toplevel` succeeded, but included for robustness.
         SCRIPT_IS_GIT_REPO=false
-        print_message $YELLOW "  .git directory NOT found in script directory." false
-        print_message $YELLOW "Script is not in a Git repository or .git is not accessible." true
+        print_message $YELLOW "  Script directory is NOT part of a Git working tree (rev-parse check failed)." false
     fi
 }
 
