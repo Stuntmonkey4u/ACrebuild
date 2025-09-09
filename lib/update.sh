@@ -103,17 +103,14 @@ update_source_code() {
     # Fetch updates from the remote repository (only update tracking branches)
     git fetch origin || handle_error "Git fetch failed"
 
-    # Automatically detect the default branch (e.g., 'main' or 'master')
-    DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
-
     # Check if there are any new commits in the remote repository
     LOCAL=$(git rev-parse HEAD)
-    REMOTE=$(git rev-parse "origin/$DEFAULT_BRANCH")  # Use the detected default branch
+    REMOTE=$(git rev-parse "origin/HEAD") # Use the symbolic-ref for the remote's default branch
 
     if [ "$LOCAL" != "$REMOTE" ]; then
         print_message $YELLOW "New commits found. Pulling updates..." true
-        # Pull the latest changes (merge them into the local branch)
-        git pull origin "$DEFAULT_BRANCH" || handle_error "Git pull failed"
+        # Pull the latest changes from the configured upstream branch.
+        git pull || handle_error "Git pull failed"
     else
         print_message $GREEN "No new commits. Local repository is up to date." true
     fi
@@ -144,22 +141,19 @@ self_update_script() {
         return 1
     fi
 
-    # Determine Default Branch
-    DEFAULT_BRANCH=$(git remote show origin | grep 'HEAD branch' | awk '{print $NF}')
-    if [ -z "$DEFAULT_BRANCH" ]; then
-        print_message $RED "Error: Could not determine the default remote branch (e.g., main, master). Update aborted." true
+    # Check for Updates
+    LOCAL_HEAD=$(git rev-parse HEAD)
+    REMOTE_HEAD=$(git rev-parse "origin/HEAD")
+
+    if [ -z "$REMOTE_HEAD" ]; then
+        print_message $RED "Error: Could not determine the remote's default branch. Update aborted." true
         OLDPWD_PREV="${OLDPWD:-$HOME}"
         cd "$OLDPWD_PREV" &>/dev/null
         return 1
     fi
-    print_message $CYAN "Default remote branch detected as: $DEFAULT_BRANCH" false
-
-    # Check for Updates
-    LOCAL_HEAD=$(git rev-parse HEAD)
-    REMOTE_HEAD=$(git rev-parse "origin/$DEFAULT_BRANCH")
 
     if [ "$LOCAL_HEAD" = "$REMOTE_HEAD" ]; then
-        print_message $GREEN "ACrebuild.sh is already up to date (version $LOCAL_HEAD)." true
+        print_message $GREEN "ACrebuild.sh is already up to date." true
         OLDPWD_PREV="${OLDPWD:-$HOME}"
         cd "$OLDPWD_PREV" &>/dev/null
         return 0 # Success, no update needed
@@ -193,8 +187,8 @@ self_update_script() {
     fi
 
     # Perform Update
-    print_message $CYAN "Pulling latest changes from origin/$DEFAULT_BRANCH..." false
-    if ! git pull origin "$DEFAULT_BRANCH"; then
+    print_message $CYAN "Pulling latest changes..." false
+    if ! git pull; then
         print_message $RED "Error: 'git pull' failed. Update aborted. You might need to resolve conflicts manually." true
         OLDPWD_PREV="${OLDPWD:-$HOME}"
         cd "$OLDPWD_PREV" &>/dev/null
@@ -210,7 +204,7 @@ self_update_script() {
     OLDPWD_PREV="${OLDPWD:-$HOME}"
     cd "$OLDPWD_PREV" &>/dev/null
 
-    local script_actual_name=$(basename "${BASH_SOURCE[0]}")
+    local script_actual_name=$(basename "$0")
     exec "$SCRIPT_DIR_PATH/$script_actual_name" "$@" # Replace current script process with the new version
     # If exec fails for some reason (it shouldn't normally), exit to prevent unexpected behavior.
     print_message $RED "Error: Failed to restart the script with exec. Please restart it manually." true
