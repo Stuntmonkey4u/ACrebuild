@@ -1,3 +1,4 @@
+Test
 # AzerothCore Rebuild/Update Script
 
 This script is designed to help you **update**, **build**, **run**, and **manage** your **AzerothCore** server — a popular server emulator for **World of Warcraft**. It provides a simple, menu-driven interface to handle the most common server administration tasks.
