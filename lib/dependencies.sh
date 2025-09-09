@@ -4,53 +4,46 @@
 check_dependencies() {
     echo""
     print_message $BLUE "Checking for essential dependencies..." true
-    MISSING_DEPENDENCIES=() # Initialize the array here
 
-    # List of dependencies to check
-    DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc") # Added nc for netcat
-    for DEP in "${DEPENDENCIES[@]}"; do
-        command -v "$DEP" &>/dev/null
-        if [ "$?" -ne 0 ]; then
-            print_message $RED "$DEP is not installed. Please install it before continuing." false
-            MISSING_DEPENDENCIES+=("$DEP")
+    while true; do
+        MISSING_DEPENDENCIES=() # Initialize or clear the array for each check
+
+        # List of dependencies to check
+        local DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc")
+        for DEP in "${DEPENDENCIES[@]}"; do
+            if ! command -v "$DEP" &>/dev/null; then
+                MISSING_DEPENDENCIES+=("$DEP")
+            fi
+        done
+
+        # Conditionally check for Docker if it's a Docker-based setup
+        if is_docker_setup; then
+            if ! command -v docker &>/dev/null; then
+                MISSING_DEPENDENCIES+=("docker")
+            fi
+        fi
+
+        # Evaluate if dependencies are met
+        if [ ${#MISSING_DEPENDENCIES[@]} -eq 0 ]; then
+            print_message $GREEN "All required dependencies are installed.\n" true
+            break # Exit the loop, success
+        else
+            # Announce missing dependencies
+            print_message $YELLOW "The following dependencies are required but missing: ${MISSING_DEPENDENCIES[*]}" true
+            print_message $YELLOW "Would you like to try and install them now? (y/n)" true
+            read -r answer
+            if [[ "$answer" =~ ^[Yy]$ ]]; then
+                install_dependencies # This function uses the global MISSING_DEPENDENCIES array and exits on failure
+                print_message $BLUE "Re-checking dependencies after installation attempt..." true
+                # The loop will now repeat and re-check
+            else
+                print_message $RED "--------------------------------------------------------------------" true
+                print_message $RED "Critical: Cannot proceed without the required dependencies. Exiting..." true
+                print_message $RED "--------------------------------------------------------------------" true
+                exit 1
+            fi
         fi
     done
-
-    # Conditionally check for Docker if it's a Docker-based setup
-    if is_docker_setup; then
-        if ! command -v docker &> /dev/null; then
-            print_message $RED "docker is not installed. This is required for your Docker-based setup." false
-            MISSING_DEPENDENCIES+=("docker")
-        fi
-    fi
-
-    # If there are missing dependencies, prompt the user to install them
-    if [ ${#MISSING_DEPENDENCIES[@]} -gt 0 ]; then
-        ask_to_install_dependencies
-    else
-        print_message $GREEN "All required dependencies are installed.\n" true
-    fi
-}
-
-
-# Function to ask if the user wants to install missing dependencies
-ask_to_install_dependencies() {
-    echo ""
-    print_message $YELLOW "The following dependencies are required but missing: ${MISSING_DEPENDENCIES[*]}" true
-    print_message $YELLOW "Would you like to try and install them now? (y/n)" true
-    read -r answer
-    if [[ "$answer" =~ ^[Yy]$ ]]; then
-        install_dependencies
-        # After attempting installation, re-check dependencies
-        print_message $BLUE "Re-checking dependencies after installation attempt..." true
-        check_dependencies
-    else
-        echo ""
-        print_message $RED "--------------------------------------------------------------------" true
-        print_message $RED "Critical: Cannot proceed without the required dependencies. Exiting..." true
-        print_message $RED "--------------------------------------------------------------------" true
-        exit 1
-    fi
 }
 
 # Function to install the missing dependencies

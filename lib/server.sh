@@ -69,18 +69,17 @@ start_servers() {
             tmux send-keys -t "$TMUX_SESSION_NAME:0.0" "cd '$server_bin_dir' && '$auth_exec_path'" C-m
 
             # Wait for Authserver to be ready by checking its port
-            AUTH_SERVER_PORT=3724
-            print_message $CYAN "Waiting for authserver to be ready on port $AUTH_SERVER_PORT (max 60 seconds)..." false
+            print_message $CYAN "Waiting for authserver to be ready on port $AUTH_PORT (max 60 seconds)..." false
             SPINNER=('\' '|' '/' '-')
             for i in {1..60}; do
-                echo -ne "${CYAN}Checking port $AUTH_SERVER_PORT: attempt $i/60 ${SPINNER[$((i % ${#SPINNER[@]}))]} \r${NC}"
-                nc -z localhost $AUTH_SERVER_PORT && break
+                echo -ne "${CYAN}Checking port $AUTH_PORT: attempt $i/60 ${SPINNER[$((i % ${#SPINNER[@]}))]} \r${NC}"
+                nc -z localhost "$AUTH_PORT" && break
                 sleep 1
             done
             echo -ne "\r${NC}                                                                          \r" # Clear spinner line
 
-            if ! nc -z localhost $AUTH_SERVER_PORT; then
-                print_message $RED "Authserver did not start or become ready on port $AUTH_SERVER_PORT within 60 seconds." true
+            if ! nc -z localhost "$AUTH_PORT"; then
+                print_message $RED "Authserver did not start or become ready on port $AUTH_PORT within 60 seconds." true
                 print_message $RED "Check TMUX session '$TMUX_SESSION_NAME' (pane '$AUTHSERVER_PANE_TITLE') for errors." true
                 tmux kill-session -t "$TMUX_SESSION_NAME" &>/dev/null # Clean up the partially started session
                 return 1
@@ -104,14 +103,13 @@ start_servers() {
             tmux send-keys -t "$TMUX_SESSION_NAME:0.1" "cd '$server_bin_dir' && '$world_exec_path'" C-m
 
             # Wait for Worldserver to be ready by checking its port
-            local WORLD_SERVER_PORT=8085 # Define Worldserver port
-            print_message $CYAN "Waiting for worldserver to be ready on port $WORLD_SERVER_PORT (max 60 seconds)..." false
+            print_message $CYAN "Waiting for worldserver to be ready on port $WORLD_PORT (max 60 seconds)..." false
             local world_spinner_chars=('\' '|' '/' '-') # Local spinner for this wait
             local world_ready=false
             for i in {1..60}; do
                 # Use echo -ne to keep spinner on the same line
-                echo -ne "\r${CYAN}Checking port $WORLD_SERVER_PORT: attempt $i/60 ${world_spinner_chars[$((i % ${#world_spinner_chars[@]}))]} ${NC} "
-                if nc -z localhost $WORLD_SERVER_PORT &>/dev/null; then
+                echo -ne "\r${CYAN}Checking port $WORLD_PORT: attempt $i/60 ${world_spinner_chars[$((i % ${#world_spinner_chars[@]}))]} ${NC} "
+                if nc -z localhost "$WORLD_PORT" &>/dev/null; then
                     world_ready=true
                     break
                 fi
@@ -120,7 +118,7 @@ start_servers() {
             echo -ne "\r${NC}                                                                          \r" # Clear spinner line
 
             if [ "$world_ready" = false ]; then
-                print_message $RED "Worldserver did not start or become ready on port $WORLD_SERVER_PORT within 60 seconds." true
+                print_message $RED "Worldserver did not start or become ready on port $WORLD_PORT within 60 seconds." true
                 print_message $RED "Check TMUX session '$TMUX_SESSION_NAME' (pane '$WORLDSERVER_PANE_TITLE') for errors." true
                 return 1 # Indicate failure
             else
@@ -184,13 +182,13 @@ stop_servers() {
             print_message $YELLOW "Sending graceful shutdown command ('$WORLDSERVER_CONSOLE_COMMAND_STOP') to Worldserver pane ($world_target_pane)..." false
             tmux send-keys -t "$world_target_pane" "$WORLDSERVER_CONSOLE_COMMAND_STOP" C-m
 
-            # Wait for Worldserver to shut down by checking port 8085
+            # Wait for Worldserver to shut down by checking its port
             local shutdown_timer=0
             local max_shutdown_wait=300 # 300 seconds = 5 minutes
-            print_message $CYAN "Waiting for Worldserver (port 8085) to shut down (up to $max_shutdown_wait seconds)..." false
+            print_message $CYAN "Waiting for Worldserver (port $WORLD_PORT) to shut down (up to $max_shutdown_wait seconds)..." false
             local spinner_chars="/-\\|"
 
-            while nc -z localhost 8085 &>/dev/null; do
+            while nc -z localhost "$WORLD_PORT" &>/dev/null; do
                 shutdown_timer=$((shutdown_timer + 1))
                 if [ "$shutdown_timer" -gt "$max_shutdown_wait" ]; then
                     print_message $RED "Worldserver did not shut down within $max_shutdown_wait seconds. Proceeding with pane kill." true
@@ -202,8 +200,8 @@ stop_servers() {
             done
             echo -ne "\r${NC}                                                                          \r" # Clear spinner line
 
-            if ! nc -z localhost 8085 &>/dev/null; then
-                print_message $GREEN "Worldserver on port 8085 has shut down." false
+            if ! nc -z localhost "$WORLD_PORT" &>/dev/null; then
+                print_message $GREEN "Worldserver on port $WORLD_PORT has shut down." false
             fi
 
             if [ -n "$POST_SHUTDOWN_DELAY_SECONDS" ] && [ "$POST_SHUTDOWN_DELAY_SECONDS" -gt 0 ]; then
@@ -326,17 +324,17 @@ check_server_status() {
             fi
         fi
 
-        if nc -z localhost 3724 &>/dev/null; then
+        if nc -z localhost "$AUTH_PORT" &>/dev/null; then
             auth_port_listening=true
         fi
 
         if $auth_port_listening && $auth_process_likely_running; then
-            auth_status_msg="Authserver: Running (PID: $auth_pid, Process Name OK), Port 3724: Listening"
+            auth_status_msg="Authserver: Running (PID: $auth_pid, Process Name OK), Port $AUTH_PORT: Listening"
             auth_status_color=$GREEN
         elif $auth_port_listening && ! $auth_process_likely_running; then
-            auth_status_msg="Authserver: Port 3724 Listening (Process name check inconclusive for pane PID $auth_pid)"
+            auth_status_msg="Authserver: Port $AUTH_PORT Listening (Process name check inconclusive for pane PID $auth_pid)"
         elif ! $auth_port_listening && $auth_process_likely_running; then
-            auth_status_msg="Authserver: Process Found (PID: $auth_pid, Name OK), Port 3724: Not Listening"
+            auth_status_msg="Authserver: Process Found (PID: $auth_pid, Name OK), Port $AUTH_PORT: Not Listening"
         elif [ -n "$auth_pid" ]; then
             auth_status_msg="Authserver: Pane $auth_server_pane active (PID: $auth_pid), but process/port non-responsive."
             auth_status_color=$RED
@@ -354,26 +352,26 @@ check_server_status() {
             fi
         fi
 
-        if nc -z localhost 8085 &>/dev/null; then
+        if nc -z localhost "$WORLD_PORT" &>/dev/null; then
             world_port_listening=true
         fi
 
         if $world_port_listening; then
             if $world_process_likely_running; then
-                world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port 8085: Listening"
+                world_status_msg="Worldserver: Running (PID: $world_pid, Process Name OK), Port $WORLD_PORT: Listening"
                 world_status_color=$GREEN
             elif [ "$world_pid" == "$auth_pid" ]; then
-                 world_status_msg="Worldserver: Port 8085 Listening (Process name check complex due to shared pane PID with Authserver: $world_pid)"
+                 world_status_msg="Worldserver: Port $WORLD_PORT Listening (Process name check complex due to shared pane PID with Authserver: $world_pid)"
                  world_status_color=$GREEN
             else
-                world_status_msg="Worldserver: Port 8085 Listening (Process name check inconclusive for pane PID $world_pid)"
+                world_status_msg="Worldserver: Port $WORLD_PORT Listening (Process name check inconclusive for pane PID $world_pid)"
             fi
         else
             if $world_process_likely_running; then
-                world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port 8085: Not Listening"
+                world_status_msg="Worldserver: Process Found (PID: $world_pid, Name OK), Port $WORLD_PORT: Not Listening"
             elif [ -n "$world_pid" ]; then
                 if [ "$world_pid" == "$auth_pid" ]; then
-                     world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid, shared with Authserver), Port 8085: Not Listening."
+                     world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid, shared with Authserver), Port $WORLD_PORT: Not Listening."
                 else
                      world_status_msg="Worldserver: Pane $world_server_pane active (PID: $world_pid), but Worldserver process/port non-responsive."
                 fi
@@ -423,7 +421,7 @@ run_tmux_session() {
 
 # Function to ask for confirmation before updating or building.
 # This function performs several pre-build checks:
-# 1. Checks if Authserver (port 3724) or Worldserver (port 8085) seem to be running using 'nc'.
+# 1. Checks if Authserver (port $AUTH_PORT) or Worldserver (port $WORLD_PORT) seem to be running using 'nc'.
 # 2. If servers appear active, it prompts the user to stop them.
 # 3. If user agrees to stop:
 #    a. Calls `stop_servers()`.
@@ -439,12 +437,12 @@ ask_for_update_confirmation() {
     # Step 1: Check if servers are running using port checks
     local auth_port_active=false
     local world_port_active=false
-    if nc -z localhost 3724 &>/dev/null; then auth_port_active=true; fi
-    if nc -z localhost 8085 &>/dev/null; then world_port_active=true; fi
+    if nc -z localhost "$AUTH_PORT" &>/dev/null; then auth_port_active=true; fi
+    if nc -z localhost "$WORLD_PORT" &>/dev/null; then world_port_active=true; fi
 
     # Step 2 & 3: If servers active, prompt to stop
     if [ "$auth_port_active" = true ] || [ "$world_port_active" = true ]; then
-        print_message $YELLOW "Servers appear to be running (ports 3724 and/or 8085 are active)." true
+        print_message $YELLOW "Servers appear to be running (ports $AUTH_PORT and/or $WORLD_PORT are active)." true
         print_message $YELLOW "It is strongly recommended to stop them before rebuilding." true
         print_message $YELLOW "Would you like to attempt to stop the servers now? (y/n)" true
         read -r stop_choice
@@ -454,7 +452,7 @@ ask_for_update_confirmation() {
             local stop_result=$? # Capture return status of stop_servers (though currently it always returns 0)
 
             # Step 3b: Re-check ports to confirm successful shutdown
-            if nc -z localhost 3724 &>/dev/null || nc -z localhost 8085 &>/dev/null; then
+            if nc -z localhost "$AUTH_PORT" &>/dev/null || nc -z localhost "$WORLD_PORT" &>/dev/null; then
                 # This condition means either stop_servers() didn't effectively stop them, or they restarted quickly.
                 print_message $RED "Failed to stop servers (ports still active after stop attempt; stop_servers status: \"$stop_result\")." true
                 print_message $RED "Rebuild aborted to prevent issues. Please stop servers manually via Process Management." true
@@ -469,7 +467,7 @@ ask_for_update_confirmation() {
         fi
     else
         # Servers were not detected as running by port check
-        print_message $GREEN "Servers appear to be stopped (ports 3724 and 8085 are not active)." false
+        print_message $GREEN "Servers appear to be stopped (ports $AUTH_PORT and $WORLD_PORT are not active)." false
     fi
 
     # Step 5: Ask about updating source code
@@ -590,18 +588,17 @@ run_authserver() {
     AUTH_SERVER_PID=$!
 
     # Wait for the authserver to be ready by checking if the server is listening on the specified port
-    AUTH_SERVER_PORT=3724  # Replace this with the actual port your authserver uses
-    printf "%b" "${GREEN}Waiting for authserver to be ready on port $AUTH_SERVER_PORT... "
+    printf "%b" "${GREEN}Waiting for authserver to be ready on port $AUTH_PORT... "
 
     # Wait for authserver to start accepting connections (max wait 60 seconds)
     for i in {1..60}; do
-        nc -z localhost "$AUTH_SERVER_PORT" &>/dev/null && break # Fixed: Silencing nc output
+        nc -z localhost "$AUTH_PORT" &>/dev/null && break # Fixed: Silencing nc output
         sleep 1
         printf "%b" "." # Simple visual feedback during wait
     done
 
     # If we didn't break out of the loop, the server isn't ready
-    if ! nc -z localhost "$AUTH_SERVER_PORT" &>/dev/null; then # Fixed: Silencing nc output in check as well
+    if ! nc -z localhost "$AUTH_PORT" &>/dev/null; then # Fixed: Silencing nc output in check as well
         printf "\n" # Newline after dots
         handle_error "Authserver did not start within the expected time frame."
     fi

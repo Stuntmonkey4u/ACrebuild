@@ -121,242 +121,231 @@ show_current_configuration() {
 
 # Function to display configuration management menu
 show_config_management_menu() {
-    echo ""
-    print_message $BLUE "=========== CONFIGURATION MANAGEMENT MENU ============" true
-    echo ""
-    local docker_status_msg="DISABLED"
-    if [ "$USE_DOCKER" = true ]; then
-        docker_status_msg="ENABLED"
-    fi
-    print_message $CYAN "Docker Mode is currently: $docker_status_msg" false
-    echo ""
-    print_message $YELLOW "Select an option:" true
-    echo ""
-    print_message $YELLOW "  [1] View Current Configuration" false
-    print_message $YELLOW "  [2] Edit Configuration File ($CONFIG_FILE)" false
-    print_message $YELLOW "  [3] Toggle Docker Mode" false
-    print_message $YELLOW "  [4] Reset Configuration to Defaults" false
-    print_message $YELLOW "  [5] Return to Main Menu" false
-    echo ""
-    print_message $BLUE "----------------------------------------------------" true
-    handle_config_management_choice
-}
-
-# Function to handle configuration management menu choices
-handle_config_management_choice() {
-    echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" config_choice
-    case "$config_choice" in
-        1)
-            show_current_configuration
-            ;;
-        2)
-            print_message $CYAN "Attempting to open $CONFIG_FILE for editing..." false
-            # Prioritize $EDITOR variable if it is set and points to an executable command
-            # Use ${EDITOR-} to avoid unbound variable error if 'set -u' is active
-            if [ -n "${EDITOR-}" ] && command -v "$EDITOR" &> /dev/null; then
-                print_message $CYAN "Using editor from \$EDITOR environment variable: $EDITOR" false
-                "$EDITOR" "$CONFIG_FILE"
-            elif command -v nano &> /dev/null; then
-                print_message $CYAN "Using nano..." false
-                nano "$CONFIG_FILE"
-            elif command -v vi &> /dev/null; then
-                print_message $YELLOW "nano not found, using vi..." false
-                vi "$CONFIG_FILE"
-            elif command -v ed &> /dev/null; then
-                print_message $YELLOW "nano and vi not found, using ed..." false
-                ed "$CONFIG_FILE"
-            else
-                print_message $RED "No suitable text editor (nano, vi, ed, or from \$EDITOR) found." true
-            fi
-            print_message $CYAN "Reloading configuration after edit..." true
-            load_config # Reload config after editing
-            ;;
-        3)
-            local new_docker_mode
-            if [ "$USE_DOCKER" = true ]; then
-                new_docker_mode=false
-                print_message $GREEN "Disabling Docker Mode." false
-            else
-                new_docker_mode=true
-                print_message $GREEN "Enabling Docker Mode." false
-            fi
-            save_config_value "USE_DOCKER" "$new_docker_mode"
-            # Reload config to make the change active immediately
-            load_config
-            ;;
-        4)
-            print_message $RED "${BOLD}WARNING: This will delete your current configuration file and reset all settings to default.${NC}" true
-            print_message $YELLOW "Are you sure you want to proceed? (y/n)" true
-            read -r confirm_reset
-            if [[ "$confirm_reset" =~ ^[Yy]$ ]]; then
-                print_message $CYAN "Deleting $CONFIG_FILE..." false
-                rm -f "$CONFIG_FILE"
-                if [ "$?" -eq 0 ]; then
-                    print_message $GREEN "Configuration file deleted." false
-                else
-                    print_message $RED "Error deleting configuration file. Check permissions." true
-                fi
-                print_message $CYAN "Reloading and creating default configuration..." false
-                load_config # This will call create_default_config if file is missing
-                print_message $GREEN "Configuration has been reset to defaults." true
-            else
-                print_message $GREEN "Configuration reset aborted." false
-            fi
-            ;;
-        5)
-            print_message $GREEN "Returning to Main Menu..." false
-            return
-            ;;
-        *)
-            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
-            ;;
-    esac
-    # After an action, explicitly call show_config_management_menu again
-    if [[ "$config_choice" != "5" ]]; then
-        # Adding a small pause and clear before showing the menu again for better UX
-        read -n 1 -s -r -p "Press any key to return to Configuration Management menu..."
+    while true; do
         clear
-        show_config_management_menu
-    fi
+        echo ""
+        print_message $BLUE "=========== CONFIGURATION MANAGEMENT MENU ============" true
+        echo ""
+        local docker_status_msg="DISABLED"
+        if [ "$USE_DOCKER" = true ]; then
+            docker_status_msg="ENABLED"
+        fi
+        print_message $CYAN "Docker Mode is currently: $docker_status_msg" false
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] View Current Configuration" false
+        print_message $YELLOW "  [2] Edit Configuration File ($CONFIG_FILE)" false
+        print_message $YELLOW "  [3] Toggle Docker Mode" false
+        print_message $YELLOW "  [4] Reset Configuration to Defaults" false
+        print_message $YELLOW "  [5] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "----------------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" config_choice
+        case "$config_choice" in
+            1)
+                show_current_configuration
+                ;;
+            2)
+                print_message $CYAN "Attempting to open $CONFIG_FILE for editing..." false
+                # Prioritize $EDITOR variable if it is set and points to an executable command
+                # Use ${EDITOR-} to avoid unbound variable error if 'set -u' is active
+                if [ -n "${EDITOR-}" ] && command -v "$EDITOR" &> /dev/null; then
+                    print_message $CYAN "Using editor from \$EDITOR environment variable: $EDITOR" false
+                    "$EDITOR" "$CONFIG_FILE"
+                elif command -v nano &> /dev/null; then
+                    print_message $CYAN "Using nano..." false
+                    nano "$CONFIG_FILE"
+                elif command -v vi &> /dev/null; then
+                    print_message $YELLOW "nano not found, using vi..." false
+                    vi "$CONFIG_FILE"
+                elif command -v ed &> /dev/null; then
+                    print_message $YELLOW "nano and vi not found, using ed..." false
+                    ed "$CONFIG_FILE"
+                else
+                    print_message $RED "No suitable text editor (nano, vi, ed, or from \$EDITOR) found." true
+                fi
+                print_message $CYAN "Reloading configuration after edit..." true
+                load_config # Reload config after editing
+                ;;
+            3)
+                local new_docker_mode
+                if [ "$USE_DOCKER" = true ]; then
+                    new_docker_mode=false
+                    print_message $GREEN "Disabling Docker Mode." false
+                else
+                    new_docker_mode=true
+                    print_message $GREEN "Enabling Docker Mode." false
+                fi
+                save_config_value "USE_DOCKER" "$new_docker_mode"
+                # Reload config to make the change active immediately
+                load_config
+                ;;
+            4)
+                print_message $RED "${BOLD}WARNING: This will delete your current configuration file and reset all settings to default.${NC}" true
+                print_message $YELLOW "Are you sure you want to proceed? (y/n)" true
+                read -r confirm_reset
+                if [[ "$confirm_reset" =~ ^[Yy]$ ]]; then
+                    print_message $CYAN "Deleting $CONFIG_FILE..." false
+                    rm -f "$CONFIG_FILE"
+                    if [ "$?" -eq 0 ]; then
+                        print_message $GREEN "Configuration file deleted." false
+                    else
+                        print_message $RED "Error deleting configuration file. Check permissions." true
+                    fi
+                    print_message $CYAN "Reloading and creating default configuration..." false
+                    load_config # This will call create_default_config if file is missing
+                    print_message $GREEN "Configuration has been reset to defaults." true
+                else
+                    print_message $GREEN "Configuration reset aborted." false
+                fi
+                ;;
+            5)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+                ;;
+        esac
+
+        # Adding a small pause before showing the menu again for better UX
+        if [[ "$config_choice" != "5" ]]; then
+             read -n 1 -s -r -p "Press any key to return to Configuration Management menu..."
+        fi
+    done
 }
 
 
 # Function to display backup and restore menu
 show_backup_restore_menu() {
-    echo ""
-    print_message $BLUE "============== BACKUP/RESTORE MENU ==============" true
-    echo ""
-    print_message $YELLOW "Select an option:" true
-    echo ""
-    print_message $YELLOW "  [1] Create Backup" false
-    print_message $YELLOW "  [2] Create Backup (Dry Run)" false
-    print_message $YELLOW "  [3] Restore from Backup" false
-    print_message $YELLOW "  [4] Return to Main Menu" false
-    echo ""
-    print_message $BLUE "-----------------------------------------------" true
-    handle_backup_restore_choice # Call a new handler for this menu
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "============== BACKUP/RESTORE MENU ==============" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Create Backup" false
+        print_message $YELLOW "  [2] Create Backup (Dry Run)" false
+        print_message $YELLOW "  [3] Restore from Backup" false
+        print_message $YELLOW "  [4] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_choice
+        case "$backup_choice" in
+            1)
+                create_backup
+                ;;
+            2)
+                create_backup_dry_run
+                ;;
+            3)
+                restore_backup
+                ;;
+            4)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+                ;;
+        esac
+        # Adding a small pause before showing the menu again for better UX
+        if [[ "$backup_choice" != "4" ]]; then
+            read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
+        fi
+    done
 }
 
 # Function to display log viewer menu
 show_log_viewer_menu() {
-    echo ""
-    print_message $BLUE "================== LOG VIEWER MENU ==================" true
-    echo ""
-    print_message $YELLOW "Select a log to view:" true
-    echo ""
-    print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
-    print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false # Use variable here
-    print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false   # Use variable here (for Server.log)
-    print_message $YELLOW "  [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false  # New entry, use variable
-    print_message $YELLOW "  [5] Return to Main Menu" false # Renumbered
-    echo ""
-    print_message $BLUE "---------------------------------------------------" true
-    handle_log_viewer_choice
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "================== LOG VIEWER MENU ==================" true
+        echo ""
+        print_message $YELLOW "Select a log to view:" true
+        echo ""
+        print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
+        print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "  [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false
+        print_message $YELLOW "  [5] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "---------------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice
+        case "$log_choice" in
+            1) view_script_log ;;
+            2) view_auth_log ;;
+            3) view_world_log ;;
+            4) view_error_log ;;
+            5)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+                ;;
+        esac
+        # Adding a small pause before showing the menu again for better UX
+        if [[ "$log_choice" != "5" ]]; then
+            read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
+        fi
+    done
 }
 
 # Function to display process management menu
 show_process_management_menu() {
-    echo ""
-    print_message $BLUE "=========== PROCESS MANAGEMENT MENU ============" true
-    echo ""
-    print_message $YELLOW "Select an option:" true
-    echo ""
-    print_message $YELLOW "  [1] Start Servers" false
-    print_message $YELLOW "  [2] Stop Servers" false
-    print_message $YELLOW "  [3] Restart Servers" false
-    print_message $YELLOW "  [4] Check Server Status" false
-    print_message $YELLOW "  [5] Return to Main Menu" false
-    echo ""
-    print_message $BLUE "-----------------------------------------------" true
-    handle_process_management_choice # Call a new handler for this menu
-}
-
-# Function to handle process management menu choices
-handle_process_management_choice() {
-    echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" proc_choice
-    case "$proc_choice" in
-        1)
-            start_servers
-            ;;
-        2)
-            stop_servers
-            ;;
-        3)
-            restart_servers
-            ;;
-        4)
-            check_server_status
-            ;;
-        5)
-            print_message $GREEN "Returning to Main Menu..." false
-            return
-            ;;
-        *)
-            print_message $RED "Invalid choice. Please select a valid option (1-5)." false
-            ;;
-    esac
-    # After an action, explicitly call show_process_management_menu again
-    if [[ "$proc_choice" != "5" ]]; then
-        # Adding a small pause and clear before showing the menu again for better UX
-        read -n 1 -s -r -p "Press any key to return to Process Management menu..."
+    while true; do
         clear
-        show_process_management_menu
-    fi
-}
+        echo ""
+        print_message $BLUE "=========== PROCESS MANAGEMENT MENU ============" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Start Servers" false
+        print_message $YELLOW "  [2] Stop Servers" false
+        print_message $YELLOW "  [3] Restart Servers" false
+        print_message $YELLOW "  [4] Check Server Status" false
+        print_message $YELLOW "  [5] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
 
-# Function to handle log viewer menu choices
-handle_log_viewer_choice() {
-    echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice # Updated prompt
-    case "$log_choice" in
-        1) view_script_log ;;
-        2) view_auth_log ;;
-        3) view_world_log ;;
-        4) view_error_log ;; # New case
-        5) # Return to Main Menu - Updated case number
-            print_message $GREEN "Returning to Main Menu..." false
-            return
-            ;;
-        *)
-            print_message $RED "Invalid choice. Please select a valid option (1-5)." false # Updated message
-            ;;
-    esac
-    # After an action, explicitly call show_log_viewer_menu again
-    if [[ "$log_choice" != "5" ]]; then # Updated condition
-        show_log_viewer_menu
-    fi
-}
-
-# Function to handle backup/restore menu choices
-handle_backup_restore_choice() {
-    echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_choice
-    case "$backup_choice" in
-        1)
-            create_backup
-            ;;
-        2)
-            create_backup_dry_run
-            ;;
-        3)
-            restore_backup
-            ;;
-        4)
-            print_message $GREEN "Returning to Main Menu..." false
-            return
-            ;;
-        *)
-            print_message $RED "Invalid choice. Please select a valid option (1-4)." false
-            # We can optionally call show_backup_restore_menu again or just let it return
-            ;;
-    esac
-    # After an action, explicitly call show_backup_restore_menu again to re-display it
-    # unless the choice was to return to the main menu.
-    if [[ "$backup_choice" != "4" ]]; then
-        show_backup_restore_menu
-    fi
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" proc_choice
+        case "$proc_choice" in
+            1)
+                start_servers
+                ;;
+            2)
+                stop_servers
+                ;;
+            3)
+                restart_servers
+                ;;
+            4)
+                check_server_status
+                ;;
+            5)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+                ;;
+        esac
+        # Adding a small pause before showing the menu again for better UX
+        if [[ "$proc_choice" != "5" ]]; then
+            read -n 1 -s -r -p "Press any key to return to Process Management menu..."
+        fi
+    done
 }
 
 # Function to handle user input for the main menu.
