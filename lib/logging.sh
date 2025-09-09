@@ -37,9 +37,9 @@ view_log_file() {
     clear
 
     if [ "$chosen_mode" = "less" ]; then
-        less "$log_file_path"
+        less -- "$log_file_path"
     elif [ "$chosen_mode" = "tail_f" ]; then
-        tail -f "$log_file_path"
+        tail -f -- "$log_file_path"
     fi
     # After exiting less or tail -f, clear and show a message
     clear

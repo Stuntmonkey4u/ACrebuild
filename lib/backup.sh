@@ -117,19 +117,21 @@ create_backup() {
     DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
     for DB_NAME in "${DATABASES[@]}"; do
         print_message $CYAN "Backing up database: $DB_NAME..." false
-        local dump_cmd=""
+        local backup_failed=false
         if is_docker_setup; then
-            dump_cmd="docker compose exec -T ac-db mysqldump -u\"$DB_USER\" -p\"$effective_db_pass\" \"$DB_NAME\""
+            # Use environment variable for password to avoid process list exposure
+            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-db mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
         else
-            dump_cmd="mysqldump -u\"$DB_USER\" -p\"$effective_db_pass\" \"$DB_NAME\""
+            # Use environment variable for password to avoid process list exposure
+            MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
         fi
 
-        if eval "$dump_cmd" > "$BACKUP_SUBDIR/$DB_NAME.sql"; then
-            print_message $GREEN "Database $DB_NAME backed up successfully." false
-        else
+        if [ "$backup_failed" = true ]; then
             print_message $RED "Error backing up database $DB_NAME." true
             rm -rf "$BACKUP_SUBDIR"
             return 1
+        else
+            print_message $GREEN "Database $DB_NAME backed up successfully." false
         fi
     done
 
@@ -210,19 +212,21 @@ restore_backup() {
         fi
         print_message $CYAN "Restoring database: $DB_NAME..." false
 
-        local import_cmd=""
+        local restore_failed=false
         if is_docker_setup; then
-            import_cmd="docker compose exec -T ac-db mysql -u\"$DB_USER\" -p\"$effective_db_pass\" \"$DB_NAME\""
+            # Use -i for stdin, -T to disable tty, and MYSQL_PWD for password
+            cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-db mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
         else
-            import_cmd="mysql -u\"$DB_USER\" -p\"$effective_db_pass\" \"$DB_NAME\""
+            # Use environment variable for password
+            cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
         fi
 
-        if cat "$SQL_FILE" | eval "$import_cmd"; then
-            print_message $GREEN "Database $DB_NAME restored successfully." false
-        else
+        if [ "$restore_failed" = true ]; then
             print_message $RED "Error restoring database $DB_NAME." true
             rm -rf "$TEMP_RESTORE_DIR"
             return 1
+        else
+            print_message $GREEN "Database $DB_NAME restored successfully." false
         fi
     done
 

@@ -179,8 +179,11 @@ POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
 # If this is true, the script will use 'docker compose' for server management.
 USE_DOCKER="$DEFAULT_USE_DOCKER"
 EOF
-    if [ $? -eq 0 ]; then
+    local cat_exit_code=$?
+    if [ $cat_exit_code -eq 0 ]; then
         print_message $GREEN "Default configuration file created successfully." true
+        # Set permissions to 600 (read/write for owner only) for security
+        chmod 600 "$CONFIG_FILE" 2>/dev/null || print_message $YELLOW "Warning: Could not set permissions for $CONFIG_FILE. Please set them manually to 600." false
     else
         print_message $RED "Error creating default configuration file. Please check permissions for $CONFIG_DIR." true
         # Not exiting here, load_config will handle the error if file is unusable

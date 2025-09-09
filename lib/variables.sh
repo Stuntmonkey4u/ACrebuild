@@ -14,12 +14,12 @@ WORLDSERVER_PANE_TITLE="Worldserver" # Used in current script, good to formalize
 WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes for graceful shutdown
 
 # Configuration File Variables
-CONFIG_DIR="$HOME/.ACrebuild"
-CONFIG_FILE="$CONFIG_DIR/ACrebuild.conf"
+CONFIG_DIR="${HOME}/.ACrebuild"
+CONFIG_FILE="${CONFIG_DIR}/ACrebuild.conf"
 
 # Default values for configuration
-DEFAULT_AZEROTHCORE_DIR="$HOME/azerothcore"
-DEFAULT_BACKUP_DIR="$HOME/ac_backups"
+DEFAULT_AZEROTHCORE_DIR="${HOME}/azerothcore"
+DEFAULT_BACKUP_DIR="${HOME}/ac_backups"
 DEFAULT_DB_USER="acore"
 DEFAULT_DB_PASS=""
 DEFAULT_AUTH_DB_NAME="acore_auth"
@@ -30,7 +30,7 @@ DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/bin"
 DEFAULT_AUTH_SERVER_LOG_FILENAME="Auth.log"
 DEFAULT_WORLD_SERVER_LOG_FILENAME="Server.log"
 DEFAULT_ERROR_LOG_FILENAME="Errors.log"
-DEFAULT_SCRIPT_LOG_DIR="$HOME/.ACrebuild/logs"
+DEFAULT_SCRIPT_LOG_DIR="${HOME}/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
 DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_CORES_FOR_BUILD=""
