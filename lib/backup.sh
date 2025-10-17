@@ -82,7 +82,11 @@ create_backup() {
     local db_started_by_script=false
     local backup_result=0
 
-    ensure_db_is_running
+    if [ "$non_interactive" = true ]; then
+        ensure_db_is_running --non-interactive
+    else
+        ensure_db_is_running
+    fi
     local db_check_result=$?
 
     if [ $db_check_result -eq 1 ]; then # Error or user abort

@@ -5,6 +5,11 @@
 # Returns 1 if the user aborts or an error occurs.
 # Returns 2 if the DB was started by this function, to signal cleanup is needed.
 ensure_db_is_running() {
+    local non_interactive=false
+    if [ "${1-}" == "--non-interactive" ]; then
+        non_interactive=true
+    fi
+
     if ! is_docker_setup; then
         # Not a docker setup, so we assume the local DB is managed externally.
         return 0
@@ -18,12 +23,16 @@ ensure_db_is_running() {
         return 0 # DB is already running and ready.
     fi
 
-    print_message $YELLOW "The 'ac-database' container is not running." true
-    print_message $YELLOW "It must be running for this operation. Would you like to start it temporarily? (y/n)" true
-    read -r start_db_choice
-    if [[ ! "$start_db_choice" =~ ^[Yy]$ ]]; then
-        print_message $RED "Operation aborted by user because database container is not running." true
-        return 1
+    if [ "$non_interactive" = true ]; then
+        print_message $CYAN "Database container is not running. Starting it for non-interactive task..." true
+    else
+        print_message $YELLOW "The 'ac-database' container is not running." true
+        print_message $YELLOW "It must be running for this operation. Would you like to start it temporarily? (y/n)" true
+        read -r start_db_choice
+        if [[ ! "$start_db_choice" =~ ^[Yy]$ ]]; then
+            print_message $RED "Operation aborted by user because database container is not running." true
+            return 1
+        fi
     fi
 
     print_message $CYAN "Starting 'ac-database' container..." false
@@ -58,7 +67,7 @@ database_console() {
     print_message $BLUE "--- Database Console Access ---" true
     local db_started_by_script=false
 
-    ensure_db_is_running
+    ensure_db_is_running # No --non-interactive flag here
     local db_check_result=$?
 
     if [ $db_check_result -eq 1 ]; then # Error or user abort
