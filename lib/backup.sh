@@ -43,7 +43,7 @@ create_backup_dry_run() {
     for DB_NAME in "${DATABASES[@]}"; do
         print_message $CYAN "[DRY RUN] Would back up database: $DB_NAME" false
         if is_docker_setup; then
-            print_message $WHITE "  Command: docker compose exec ac-db mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
+            print_message $WHITE "  Command: docker compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
         else
             print_message $WHITE "  Command: mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
         fi
@@ -120,7 +120,7 @@ create_backup() {
         local backup_failed=false
         if is_docker_setup; then
             # Use environment variable for password to avoid process list exposure
-            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-db mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
         else
             # Use environment variable for password to avoid process list exposure
             MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
@@ -233,7 +233,7 @@ restore_backup() {
         local restore_failed=false
         if is_docker_setup; then
             # Use -i for stdin, -T to disable tty, and MYSQL_PWD for password
-            cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-db mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+            cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
         else
             # Use environment variable for password
             cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
