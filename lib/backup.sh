@@ -71,7 +71,7 @@ create_backup_dry_run() {
 
 create_backup() {
     local non_interactive=false
-    if [ "$1" == "--non-interactive" ]; then
+    if [ "${1-}" == "--non-interactive" ]; then
         non_interactive=true
     fi
 
