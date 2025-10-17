@@ -251,10 +251,24 @@ stop_servers() {
 
 restart_servers() {
     if is_docker_setup; then
-        print_message $BLUE "--- Attempting to Restart Docker Containers ---" true
+        print_message $BLUE "--- Attempting to Restart/Start Docker Containers ---" true
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose restart
-        print_message $GREEN "Docker containers restarted." true
+
+        # Check if at least one of the main services is running
+        local auth_status
+        auth_status=$(docker inspect --format="{{.State.Status}}" ac-authserver 2>/dev/null)
+        local world_status
+        world_status=$(docker inspect --format="{{.State.Status}}" ac-worldserver 2>/dev/null)
+
+        if [ "$auth_status" = "running" ] || [ "$world_status" = "running" ]; then
+            print_message $CYAN "At least one server container is running. Issuing restart command..." false
+            docker compose restart
+            print_message $GREEN "Docker containers restart command issued." true
+        else
+            print_message $CYAN "No server containers are running. Issuing start command..." false
+            docker compose up -d
+            print_message $GREEN "Docker containers start command issued." true
+        fi
     else
         print_message $BLUE "--- Attempting to Restart AzerothCore Servers (TMUX) ---" true
         stop_servers
@@ -495,6 +509,11 @@ ask_for_update_confirmation() {
 
 # Function to ask the user how many cores they want to use for the build
 ask_for_cores() {
+    # This function is not relevant for Docker builds, so we skip it.
+    if is_docker_setup; then
+        return
+    fi
+
     local current_cores_for_build="$CORES" # CORES is the runtime var, loaded from CORES_FOR_BUILD
     local available_cores_system=$(nproc)
 
@@ -555,23 +574,30 @@ build_and_install_with_spinner() {
     print_message $BLUE "--- Starting AzerothCore Build and Installation ---" true
     print_message $YELLOW "Building and installing AzerothCore... This may take a while." true
 
-    # Ensure BUILD_DIR is correctly updated
-    if [ ! -d "$BUILD_DIR" ]; then
-        handle_error "Build directory $BUILD_DIR does not exist. Please check your AzerothCore path."
+    if is_docker_setup; then
+        print_message $CYAN "Running Docker build..." true
+        cd "$AZEROTHCORE_DIR" || handle_error "Failed to change directory to $AZEROTHCORE_DIR"
+        docker compose build || handle_error "Docker build failed. Check the output above for details."
+        print_message $GREEN "--- Docker Build Process Completed Successfully ---" true
+    else
+        # Ensure BUILD_DIR is correctly updated
+        if [ ! -d "$BUILD_DIR" ]; then
+            handle_error "Build directory $BUILD_DIR does not exist. Please check your AzerothCore path."
+        fi
+
+        # Run cmake with the provided options
+        cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR. Ensure the path is correct."
+
+        echo ""
+        print_message $CYAN "Running CMake configuration..." true
+        cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed. Check CMake logs in $BUILD_DIR for details."
+
+        echo ""
+        print_message $CYAN "Running make install with $CORES core(s)..." true
+        make -j "$CORES" install || handle_error "Build process ('make install') failed. Check the output above and logs in $BUILD_DIR for details."
+        echo ""
+        print_message $GREEN "--- AzerothCore Build and Installation Completed Successfully ---" true
     fi
-
-    # Run cmake with the provided options
-    cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR. Ensure the path is correct."
-
-    echo ""
-    print_message $CYAN "Running CMake configuration..." true
-    cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed. Check CMake logs in $BUILD_DIR for details."
-
-    echo ""
-    print_message $CYAN "Running make install with $CORES core(s)..." true
-    make -j "$CORES" install || handle_error "Build process ('make install') failed. Check the output above and logs in $BUILD_DIR for details."
-    echo ""
-    print_message $GREEN "--- AzerothCore Build and Installation Completed Successfully ---" true
 }
 
 # Function to run authserver for 60 seconds with countdown

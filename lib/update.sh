@@ -87,11 +87,9 @@ check_for_script_updates() {
     # Compare the local HEAD commit with the remote HEAD commit.
     # If they are different, it means there's an update available.
     if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
-        # Use the existing print_message function to display the notification.
-        # $YELLOW is a predefined color variable in the script.
-        # The third argument 'false' means the message text will not be bold.
-        echo ""
-        print_message "$YELLOW" "An update is available to ACrebuild" false
+        SCRIPT_UPDATE_AVAILABLE=true
+    else
+        SCRIPT_UPDATE_AVAILABLE=false
     fi
 }
 
@@ -211,15 +209,128 @@ self_update_script() {
     exit 1
 }
 
+# Function to apply SQL files from a module
+apply_module_sql() {
+    local module_dir=$1
+    local sql_files_to_apply=()
+
+    # Find all .sql files in the module's data directory
+    if [ -d "$module_dir/data/sql/db_world" ]; then
+        for sql_file in "$module_dir"/data/sql/db_world/*.sql; do
+            sql_files_to_apply+=("$sql_file")
+        done
+    fi
+    if [ -d "$module_dir/data/sql/db_char" ]; then
+        for sql_file in "$module_dir"/data/sql/db_char/*.sql; do
+            sql_files_to_apply+=("$sql_file")
+        done
+    fi
+    if [ -d "$module_dir/data/sql/db_auth" ]; then
+        for sql_file in "$module_dir"/data/sql/db_auth/*.sql; do
+            sql_files_to_apply+=("$sql_file")
+        done
+    fi
+
+    if [ ${#sql_files_to_apply[@]} -eq 0 ]; then
+        print_message $GREEN "No new SQL files found for module $(basename "$module_dir")." false
+        return
+    fi
+
+    print_message $YELLOW "The following SQL files were found for module $(basename "$module_dir"):" true
+    for sql_file in "${sql_files_to_apply[@]}"; do
+        print_message $YELLOW "  - $(basename "$sql_file")" false
+    done
+
+    print_message $YELLOW "Would you like to apply these SQL files now? (y/n)" true
+    read -r apply_sql_choice
+    if [[ "$apply_sql_choice" =~ ^[Yy]$ ]]; then
+        for sql_file in "${sql_files_to_apply[@]}"; do
+            local db_name=""
+            if [[ "$sql_file" == *"db_world"* ]]; then
+                db_name="$WORLD_DB_NAME"
+            elif [[ "$sql_file" == *"db_char"* ]]; then
+                db_name="$CHAR_DB_NAME"
+            elif [[ "$sql_file" == *"db_auth"* ]]; then
+                db_name="$AUTH_DB_NAME"
+            fi
+
+            if [ -n "$db_name" ]; then
+                print_message $CYAN "Applying $(basename "$sql_file") to database '$db_name'..." false
+                if is_docker_setup; then
+                    cat "$sql_file" | docker compose exec -i -T -e MYSQL_PWD="$DB_PASS" ac-database mysql -u"$DB_USER" "$db_name"
+                else
+                    cat "$sql_file" | MYSQL_PWD="$DB_PASS" mysql -u"$DB_USER" "$db_name"
+                fi
+                if [ $? -eq 0 ]; then
+                    print_message $GREEN "Successfully applied $(basename "$sql_file")." false
+                else
+                    print_message $RED "Error applying $(basename "$sql_file")." true
+                fi
+            fi
+        done
+    else
+        print_message $CYAN "Skipping SQL import for module $(basename "$module_dir")." false
+    fi
+}
+
 # Function to update a specific module by pulling the latest changes
 update_module() {
     local module_dir=$1
-    print_message $BLUE "Attempting to pull latest changes for module $(basename "$module_dir")..." false # Changed to print_message and basename
+    print_message $BLUE "Attempting to pull latest changes for module $(basename "$module_dir")..." false
     if run_command "git pull" "$module_dir"; then
         print_message $GREEN "Successfully updated module $(basename "$module_dir")." false
+        apply_module_sql "$module_dir"
     else
         print_message $RED "Failed to update module $(basename "$module_dir"). Please check output above for errors (e.g., merge conflicts, detached HEAD, network issues)." true
     fi
+}
+
+# Function to install a new module from a Git repository
+install_module() {
+    print_message $BLUE "--- Install New Module ---" true
+
+    local modules_dir="${AZEROTHCORE_DIR}/modules"
+    if [ ! -d "$modules_dir" ]; then
+        print_message $YELLOW "Modules directory not found at '$modules_dir'." true
+        print_message $YELLOW "Creating it now..." true
+        mkdir -p "$modules_dir" || { print_message $RED "Failed to create modules directory. Aborting." true; return 1; }
+    fi
+
+    print_message $YELLOW "Please enter the full Git URL of the module you want to install:" true
+    read -r git_url
+
+    if [ -z "$git_url" ]; then
+        print_message $RED "No URL entered. Aborting." true
+        return 1
+    fi
+
+    # Basic validation for a git URL
+    if [[ ! "$git_url" =~ \.git$ ]]; then
+        print_message $RED "Invalid Git URL. It should end with '.git'. Aborting." true
+        return 1
+    fi
+
+    # Extract a module name from the URL to create a directory
+    local module_name
+    module_name=$(basename "$git_url" .git)
+
+    local target_dir="$modules_dir/$module_name"
+    if [ -d "$target_dir" ]; then
+        print_message $RED "A directory named '$module_name' already exists in your modules folder. Aborting." true
+        return 1
+    fi
+
+    print_message $CYAN "Cloning module '$module_name' from '$git_url'..." false
+    git clone "$git_url" "$target_dir"
+    if [ $? -ne 0 ]; then
+        print_message $RED "Failed to clone the module. Please check the URL and your connection." true
+        return 1
+    fi
+
+    print_message $GREEN "Module '$module_name' installed successfully." true
+
+    # After installing, run the SQL check
+    apply_module_sql "$target_dir"
 }
 
 # Function to check for updates in modules
