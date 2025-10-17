@@ -43,9 +43,7 @@ view_log_file() {
     fi
     # After exiting less or tail -f, clear and show a message
     clear
-    print_message $GREEN "Exited log view. Press any key to return to the Log Viewer menu..." true
-    read -n 1 -s -r
-    echo ""
+    print_message $GREEN "Exited log view." true
 }
 
 view_script_log() {
@@ -107,8 +105,6 @@ view_error_log() {
     if is_docker_setup; then
         print_message $YELLOW "In Docker mode, server errors are typically shown in the main container logs." true
         print_message $YELLOW "Please check the logs for 'ac-authserver' or 'ac-worldserver' instead." true
-        read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
-        echo ""
     else
         local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
         view_log_file "$full_error_log_path" "less"

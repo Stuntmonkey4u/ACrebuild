@@ -120,8 +120,6 @@ show_current_configuration() {
     echo ""
     print_message $BLUE "----------------------------------------------------" true
     echo ""
-    read -n 1 -s -r -p "Press any key to return..."
-    echo "" # Add a newline after the key press
 }
 
 # Function to display configuration management menu
