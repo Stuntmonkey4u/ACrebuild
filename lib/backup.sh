@@ -124,7 +124,7 @@ create_backup() {
             if [ -n "$effective_db_pass" ]; then
                 print_message $YELLOW "Save this database password to configuration? (Not Recommended)" true
                 read -r save_pass_choice
-                if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
+                if [[ "$save_pass_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
                     save_config_value "DB_PASS" "$effective_db_pass"
                     DB_PASS="$effective_db_pass"
                 fi
