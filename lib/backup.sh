@@ -75,52 +75,13 @@ create_backup() {
     local db_started_by_script=false
     local backup_result=0
 
-    # For Docker, check if the database is running and offer to start it.
-    if is_docker_setup; then
-        # Ensure we're in the right directory for docker compose commands
-        cd "$AZEROTHCORE_DIR" || { print_message $RED "Cannot find AzerothCore directory. Aborting." true; return 1; }
+    ensure_db_is_running
+    local db_check_result=$?
 
-        local db_status
-        db_status=$(docker inspect --format="{{.State.Status}}" ac-database 2>/dev/null)
-
-        if [ "$db_status" != "running" ]; then
-            print_message $YELLOW "The 'ac-database' container is not running." true
-            print_message $YELLOW "Would you like to start it temporarily for the backup? (y/n)" true
-            read -r start_db_choice
-            if [[ "$start_db_choice" =~ ^[Yy]$ ]]; then
-                print_message $CYAN "Starting 'ac-database' container..." false
-                docker compose up -d ac-database || { print_message $RED "Failed to start ac-database container. Aborting backup." true; return 1; }
-                db_started_by_script=true
-
-                print_message $CYAN "Waiting for database to become healthy (max 120 seconds)..." false
-                local health_timer=0
-                local max_health_wait=120
-                while true; do
-                    local health_status
-                    health_status=$(docker inspect --format="{{.State.Health.Status}}" ac-database 2>/dev/null)
-                    if [ "$health_status" = "healthy" ]; then
-                        print_message $GREEN "Database is healthy." false
-                        break
-                    fi
-
-                    health_timer=$((health_timer + 1))
-                    if [ "$health_timer" -gt "$max_health_wait" ]; then
-                        print_message $RED "Database did not become healthy within $max_health_wait seconds. Aborting backup." true
-                        # Stop the container if we started it
-                        if [ "$db_started_by_script" = true ]; then
-                            docker compose stop ac-database &>/dev/null
-                        fi
-                        return 1
-                    fi
-                    sleep 1
-                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
-                done
-                echo "" # Newline after spinner
-            else
-                print_message $RED "Backup aborted by user because database container is not running." true
-                return 1
-            fi
-        fi
+    if [ $db_check_result -eq 1 ]; then # Error or user abort
+        return 1
+    elif [ $db_check_result -eq 2 ]; then # DB was started by the helper
+        db_started_by_script=true
     fi
 
     # Subshell to contain the main backup logic and capture its exit code
@@ -225,47 +186,13 @@ restore_backup() {
     local db_started_by_script=false
     local restore_result=0
 
-    # For Docker, check if the database is running and offer to start it.
-    if is_docker_setup; then
-        cd "$AZEROTHCORE_DIR" || { print_message $RED "Cannot find AzerothCore directory. Aborting." true; return 1; }
-        local db_status
-        db_status=$(docker inspect --format="{{.State.Status}}" ac-database 2>/dev/null)
+    ensure_db_is_running
+    local db_check_result=$?
 
-        if [ "$db_status" != "running" ]; then
-            print_message $YELLOW "The 'ac-database' container is not running." true
-            print_message $YELLOW "It must be running to restore a backup. Would you like to start it temporarily? (y/n)" true
-            read -r start_db_choice
-            if [[ "$start_db_choice" =~ ^[Yy]$ ]]; then
-                print_message $CYAN "Starting 'ac-database' container..." false
-                docker compose up -d ac-database || { print_message $RED "Failed to start ac-database container. Aborting restore." true; return 1; }
-                db_started_by_script=true
-                # Wait for health
-                # (Duplicating the health check logic from create_backup)
-                print_message $CYAN "Waiting for database to become healthy (max 120 seconds)..." false
-                local health_timer=0
-                local max_health_wait=120
-                while true; do
-                    local health_status
-                    health_status=$(docker inspect --format="{{.State.Health.Status}}" ac-database 2>/dev/null)
-                    if [ "$health_status" = "healthy" ]; then
-                        print_message $GREEN "Database is healthy." false
-                        break
-                    fi
-                    health_timer=$((health_timer + 1))
-                    if [ "$health_timer" -gt "$max_health_wait" ]; then
-                        print_message $RED "Database did not become healthy within $max_health_wait seconds. Aborting restore." true
-                        if [ "$db_started_by_script" = true ]; then docker compose stop ac-database &>/dev/null; fi
-                        return 1
-                    fi
-                    sleep 1
-                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
-                done
-                echo ""
-            else
-                print_message $RED "Restore aborted by user because database container is not running." true
-                return 1
-            fi
-        fi
+    if [ $db_check_result -eq 1 ]; then # Error or user abort
+        return 1
+    elif [ $db_check_result -eq 2 ]; then # DB was started by the helper
+        db_started_by_script=true
     fi
 
     # Subshell for the main restore logic

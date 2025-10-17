@@ -38,22 +38,22 @@ show_menu() {
     print_message $CYAN " Server Operations:" true
     print_message $YELLOW "  [1] Rebuild and Run Server        (Shortcut: R)" false
     print_message $YELLOW "  [2] Rebuild Server Only           (Shortcut: U)" false
-    # [3] Run Server Only (Shortcut: S) has been removed
-    print_message $YELLOW "  [3] Update Server Modules         (Shortcut: M)" false # Was [4]
+    print_message $YELLOW "  [3] Install New Module            (Shortcut: I)" false
+    print_message $YELLOW "  [4] Update Server Modules         (Shortcut: M)" false
     echo ""
     print_message $CYAN " Server Management & Configuration:" true
-    print_message $YELLOW "  [4] Process Management            (Shortcut: P)" false
-    print_message $YELLOW "  [5] Backup/Restore Options        (Shortcut: B)" false
-    print_message $YELLOW "  [6] Log Viewer                    (Shortcut: L)" false
-    print_message $YELLOW "  [7] Database Console              (Shortcut: D)" false
-    print_message $YELLOW "  [8] Configuration Options         (Shortcut: C)" false
+    print_message $YELLOW "  [5] Process Management            (Shortcut: P)" false
+    print_message $YELLOW "  [6] Backup/Restore Options        (Shortcut: B)" false
+    print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
+    print_message $YELLOW "  [8] Database Console              (Shortcut: D)" false
+    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
     echo ""
     print_message $CYAN " Script Maintenance:" true
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        print_message $YELLOW "  [9] Self-Update ACrebuild Script  (Shortcut: A)" false
+        print_message $YELLOW "  [10] Self-Update ACrebuild Script (Shortcut: A)" false
     fi
     print_message $CYAN " Exit:" true
-    print_message $YELLOW "  [10] Quit Script                  (Shortcut: Q)" false
+    print_message $YELLOW "  [11] Quit Script                  (Shortcut: Q)" false
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -140,13 +140,14 @@ show_config_management_menu() {
         print_message $YELLOW "  [1] View Current Configuration" false
         print_message $YELLOW "  [2] Edit Configuration File ($CONFIG_FILE)" false
         print_message $YELLOW "  [3] Toggle Docker Mode" false
-        print_message $YELLOW "  [4] Reset Configuration to Defaults" false
-        print_message $YELLOW "  [5] Return to Main Menu" false
+        print_message $YELLOW "  [4] Validate Current Settings" false
+        print_message $YELLOW "  [5] Reset Configuration to Defaults" false
+        print_message $YELLOW "  [6] Return to Main Menu" false
         echo ""
         print_message $BLUE "----------------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" config_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-6]: ${NC}")" config_choice
         case "$config_choice" in
             1)
                 show_current_configuration
@@ -197,6 +198,9 @@ show_config_management_menu() {
                 load_config
                 ;;
             4)
+                validate_settings
+                ;;
+            5)
                 print_message $RED "${BOLD}WARNING: This will delete your current configuration file and reset all settings to default.${NC}" true
                 print_message $YELLOW "Are you sure you want to proceed? (y/n)" true
                 read -r confirm_reset
@@ -215,12 +219,12 @@ show_config_management_menu() {
                     print_message $GREEN "Configuration reset aborted." false
                 fi
                 ;;
-            5)
+            6)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-6)." false
                 ;;
         esac
 
@@ -377,64 +381,70 @@ show_process_management_menu() {
 # it resets BUILD_ONLY and RUN_SERVER flags and returns to the main menu loop.
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, D, C, A, Q, or 1-10]: ${NC}")" choice
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, I, M, P, B, L, D, C, A, Q, or 1-11]: ${NC}")" choice
     case "$choice" in
-        1|[Rr]) # [1] Rebuild and Run Server
+        1|[Rr]) # Rebuild and Run Server
             RUN_SERVER=true
             BUILD_ONLY=true
             ;;
-        2|[Uu]) # [2] Rebuild Server Only
+        2|[Uu]) # Rebuild Server Only
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        3|[Mm]) # [3] Update Server Modules
+        3|[Ii]) # Install New Module
+            install_module
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        4|[Mm]) # Update Server Modules
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        4|[Pp]) # [4] Process Management
+        5|[Pp]) # Process Management
             show_process_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        5|[Bb]) # [5] Backup/Restore Options
+        6|[Bb]) # Backup/Restore Options
             show_backup_restore_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        6|[Ll]) # [6] Log Viewer
+        7|[Ll]) # Log Viewer
             show_log_viewer_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        7|[Dd]) # [7] Database Console
+        8|[Dd]) # Database Console
             database_console
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        8|[Cc]) # [8] Configuration Options
+        9|[Cc]) # Configuration Options
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        9|[Aa]) # [9] Self-Update ACrebuild Script
+        10|[Aa]) # Self-Update ACrebuild Script
             if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
                 self_update_script
             else
-                print_message $RED "Cannot self-update: This script is not in a recognized Git repository or 'origin' remote is missing." true
+                print_message $RED "Cannot self-update: This script is not in a recognized Git repository." true
             fi
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        10|[Qq]) # [10] Quit Script
+        11|[Qq]) # Quit Script
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0

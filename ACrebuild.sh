@@ -12,6 +12,7 @@ source ./lib/database.sh
 source ./lib/logging.sh
 source ./lib/ui.sh
 source ./lib/wizard.sh
+source ./lib/validation.sh
 
 # Main function to start the script
 main_menu() {

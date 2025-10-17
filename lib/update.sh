@@ -285,6 +285,54 @@ update_module() {
     fi
 }
 
+# Function to install a new module from a Git repository
+install_module() {
+    print_message $BLUE "--- Install New Module ---" true
+
+    local modules_dir="${AZEROTHCORE_DIR}/modules"
+    if [ ! -d "$modules_dir" ]; then
+        print_message $YELLOW "Modules directory not found at '$modules_dir'." true
+        print_message $YELLOW "Creating it now..." true
+        mkdir -p "$modules_dir" || { print_message $RED "Failed to create modules directory. Aborting." true; return 1; }
+    fi
+
+    print_message $YELLOW "Please enter the full Git URL of the module you want to install:" true
+    read -r git_url
+
+    if [ -z "$git_url" ]; then
+        print_message $RED "No URL entered. Aborting." true
+        return 1
+    fi
+
+    # Basic validation for a git URL
+    if [[ ! "$git_url" =~ \.git$ ]]; then
+        print_message $RED "Invalid Git URL. It should end with '.git'. Aborting." true
+        return 1
+    fi
+
+    # Extract a module name from the URL to create a directory
+    local module_name
+    module_name=$(basename "$git_url" .git)
+
+    local target_dir="$modules_dir/$module_name"
+    if [ -d "$target_dir" ]; then
+        print_message $RED "A directory named '$module_name' already exists in your modules folder. Aborting." true
+        return 1
+    fi
+
+    print_message $CYAN "Cloning module '$module_name' from '$git_url'..." false
+    git clone "$git_url" "$target_dir"
+    if [ $? -ne 0 ]; then
+        print_message $RED "Failed to clone the module. Please check the URL and your connection." true
+        return 1
+    fi
+
+    print_message $GREEN "Module '$module_name' installed successfully." true
+
+    # After installing, run the SQL check
+    apply_module_sql "$target_dir"
+}
+
 # Function to check for updates in modules
 update_modules() {
     local module_dir=$1
