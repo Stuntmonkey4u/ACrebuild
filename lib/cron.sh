@@ -57,8 +57,9 @@ setup_backup_schedule() {
     # Construct the command to be run
     local script_path="$SCRIPT_DIR_PATH/ACrebuild.sh"
     local cron_log_path="$SCRIPT_LOG_DIR/$DEFAULT_CRON_LOG_FILENAME"
-    # Wrap the command in `bash -l -c` and redirect all output to the cron log file
-    local command_to_run="bash -l -c \"cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup &>> '$cron_log_path'\" "
+    # This is the most robust way to construct a cron command with redirection.
+    # It ensures the cd and the script run together, and all output goes to the log.
+    local command_to_run="{ cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup; } > '$cron_log_path' 2>&1"
 
     # Remove any existing backup job for this script
     (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
