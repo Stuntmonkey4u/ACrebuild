@@ -50,17 +50,33 @@ view_log_file() {
 
 view_script_log() {
     print_message $CYAN "Accessing script log..." false
-    view_log_file "$SCRIPT_LOG_FILE" false # false means use default mode 'less'
+    view_log_file "$SCRIPT_LOG_FILE" "less"
+}
+
+view_script_log_live() {
+    print_message $CYAN "Accessing script log (live)..." false
+    view_log_file "$SCRIPT_LOG_FILE" "tail_f"
 }
 
 view_auth_log() {
     print_message $CYAN "Accessing auth server log..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
+        docker compose logs ac-authserver
+    else
+        local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILENAME"
+        view_log_file "$full_auth_log_path" "less"
+    fi
+}
+
+view_auth_log_live() {
+    print_message $CYAN "Accessing auth server log (live)..." false
+    if is_docker_setup; then
+        cd "$AZEROTHCORE_DIR" || return 1
         docker compose logs -f ac-authserver
     else
         local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILENAME"
-        view_log_file "$full_auth_log_path" true # true means prompt for view mode
+        view_log_file "$full_auth_log_path" "tail_f"
     fi
 }
 
@@ -68,10 +84,21 @@ view_world_log() {
     print_message $CYAN "Accessing world server log..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
+        docker compose logs ac-worldserver
+    else
+        local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
+        view_log_file "$full_world_log_path" "less"
+    fi
+}
+
+view_world_log_live() {
+    print_message $CYAN "Accessing world server log (live)..." false
+    if is_docker_setup; then
+        cd "$AZEROTHCORE_DIR" || return 1
         docker compose logs -f ac-worldserver
     else
         local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
-        view_log_file "$full_world_log_path" true # true means prompt for view mode
+        view_log_file "$full_world_log_path" "tail_f"
     fi
 }
 
@@ -84,6 +111,6 @@ view_error_log() {
         echo ""
     else
         local full_error_log_path="$SERVER_LOG_DIR_PATH/$ERROR_LOG_FILENAME"
-        view_log_file "$full_error_log_path" true # true means prompt for view mode (less/tail)
+        view_log_file "$full_error_log_path" "less"
     fi
 }

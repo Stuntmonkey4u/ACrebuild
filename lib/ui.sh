@@ -38,17 +38,18 @@ show_menu() {
     print_message $YELLOW "  [3] Update Server Modules         (Shortcut: M)" false # Was [4]
     echo ""
     print_message $CYAN " Server Management & Configuration:" true
-    print_message $YELLOW "  [4] Process Management            (Shortcut: P)" false # Was [5]
-    print_message $YELLOW "  [5] Backup/Restore Options        (Shortcut: B)" false # Was [6]
-    print_message $YELLOW "  [6] Log Viewer                    (Shortcut: L)" false # Was [7]
-    print_message $YELLOW "  [7] Configuration Options         (Shortcut: C)" false # Was [8]
+    print_message $YELLOW "  [4] Process Management            (Shortcut: P)" false
+    print_message $YELLOW "  [5] Backup/Restore Options        (Shortcut: B)" false
+    print_message $YELLOW "  [6] Log Viewer                    (Shortcut: L)" false
+    print_message $YELLOW "  [7] Database Console              (Shortcut: D)" false
+    print_message $YELLOW "  [8] Configuration Options         (Shortcut: C)" false
     echo ""
     print_message $CYAN " Script Maintenance:" true
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        print_message $YELLOW "  [8] Self-Update ACrebuild Script  (Shortcut: A)" false
+        print_message $YELLOW "  [9] Self-Update ACrebuild Script  (Shortcut: A)" false
     fi
     print_message $CYAN " Exit:" true
-    print_message $YELLOW "  [9] Quit Script                   (Shortcut: Q)" false # Renumbered from [8]
+    print_message $YELLOW "  [10] Quit Script                  (Shortcut: Q)" false
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -175,9 +176,19 @@ show_config_management_menu() {
                 if [ "$USE_DOCKER" = true ]; then
                     new_docker_mode=false
                     print_message $GREEN "Disabling Docker Mode." false
+                    # If current DB user is the Docker default, switch it to the standard default
+                    if [ "$DB_USER" == "$DEFAULT_DB_USER_DOCKER" ]; then
+                        print_message $CYAN "Switching DB_USER to standard default '$DEFAULT_DB_USER'." false
+                        save_config_value "DB_USER" "$DEFAULT_DB_USER"
+                    fi
                 else
                     new_docker_mode=true
                     print_message $GREEN "Enabling Docker Mode." false
+                    # If current DB user is the standard default, switch it to the Docker default
+                    if [ "$DB_USER" == "$DEFAULT_DB_USER" ]; then
+                        print_message $CYAN "Switching DB_USER to Docker default '$DEFAULT_DB_USER_DOCKER'." false
+                        save_config_value "DB_USER" "$DEFAULT_DB_USER_DOCKER"
+                    fi
                 fi
                 save_config_value "USE_DOCKER" "$new_docker_mode"
                 # Reload config to make the change active immediately
@@ -195,9 +206,9 @@ show_config_management_menu() {
                     else
                         print_message $RED "Error deleting configuration file. Check permissions." true
                     fi
-                    print_message $CYAN "Reloading and creating default configuration..." false
-                    load_config # This will call create_default_config if file is missing
-                    print_message $GREEN "Configuration has been reset to defaults." true
+                    # The wizard will now run on the next load_config call
+                    print_message $CYAN "Configuration has been reset. The setup wizard will run next." true
+                    load_config
                 else
                     print_message $GREEN "Configuration reset aborted." false
                 fi
@@ -271,31 +282,41 @@ show_log_viewer_menu() {
         echo ""
         print_message $YELLOW "Select a log to view:" true
         echo ""
-        print_message $YELLOW "  [1] View Script Log (ACrebuild.log)" false
-        print_message $YELLOW "  [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false
-        print_message $YELLOW "  [3] View Server Log ($WORLD_SERVER_LOG_FILENAME)" false
-        print_message $YELLOW "  [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false
-        print_message $YELLOW "  [5] Return to Main Menu" false
+        print_message $CYAN "  Standard View (less):" true
+        print_message $YELLOW "    [1] View Script Log (ACrebuild.log)" false
+        print_message $YELLOW "    [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "    [3] View World Server Log ($WORLD_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "    [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false
+        echo ""
+        print_message $CYAN "  Live View (tail -f):" true
+        print_message $YELLOW "    [5] Live View Script Log" false
+        print_message $YELLOW "    [6] Live View Auth Server Log" false
+        print_message $YELLOW "    [7] Live View World Server Log" false
+        echo ""
+        print_message $YELLOW "  [8] Return to Main Menu" false
         echo ""
         print_message $BLUE "---------------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" log_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-8]: ${NC}")" log_choice
         case "$log_choice" in
             1) view_script_log ;;
             2) view_auth_log ;;
             3) view_world_log ;;
             4) view_error_log ;;
-            5)
+            5) view_script_log_live ;;
+            6) view_auth_log_live ;;
+            7) view_world_log_live ;;
+            8)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-8)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
-        if [[ "$log_choice" != "5" ]]; then
+        if [[ "$log_choice" != "8" ]]; then
             read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
         fi
     done
@@ -354,7 +375,7 @@ show_process_management_menu() {
 # it resets BUILD_ONLY and RUN_SERVER flags and returns to the main menu loop.
 handle_menu_choice() {
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, C, A, Q, or 1-9]: ${NC}")" choice # Prompt updated
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, M, P, B, L, D, C, A, Q, or 1-10]: ${NC}")" choice
     case "$choice" in
         1|[Rr]) # [1] Rebuild and Run Server
             RUN_SERVER=true
@@ -364,7 +385,6 @@ handle_menu_choice() {
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        # Option [3] (Run Server Only) was removed.
         3|[Mm]) # [3] Update Server Modules
             MODULE_DIR="${AZEROTHCORE_DIR}/modules"
             update_modules "$MODULE_DIR"
@@ -390,15 +410,21 @@ handle_menu_choice() {
             BUILD_ONLY=false
             return
             ;;
-        7|[Cc]) # [7] Configuration Options
+        7|[Dd]) # [7] Database Console
+            database_console
+            RUN_SERVER=false
+            BUILD_ONLY=false
+            return
+            ;;
+        8|[Cc]) # [8] Configuration Options
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        8|[Aa]) # [8] Self-Update ACrebuild Script
+        9|[Aa]) # [9] Self-Update ACrebuild Script
             if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-                self_update_script # Call the new function
+                self_update_script
             else
                 print_message $RED "Cannot self-update: This script is not in a recognized Git repository or 'origin' remote is missing." true
             fi
@@ -406,7 +432,7 @@ handle_menu_choice() {
             BUILD_ONLY=false
             return
             ;;
-        9|[Qq]) # [9] Quit Script (Renumbered from 8)
+        10|[Qq]) # [10] Quit Script
             echo ""
             print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
             exit 0

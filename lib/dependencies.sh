@@ -8,19 +8,24 @@ check_dependencies() {
     while true; do
         MISSING_DEPENDENCIES=() # Initialize or clear the array for each check
 
-        # List of dependencies to check
-        local DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc")
-        for DEP in "${DEPENDENCIES[@]}"; do
-            if ! command -v "$DEP" &>/dev/null; then
-                MISSING_DEPENDENCIES+=("$DEP")
-            fi
-        done
-
-        # Conditionally check for Docker if it's a Docker-based setup
         if is_docker_setup; then
-            if ! command -v docker &>/dev/null; then
-                MISSING_DEPENDENCIES+=("docker")
-            fi
+            # In Docker mode, we only need git and docker
+            local DEPENDENCIES=("git" "docker")
+            print_message $CYAN "Docker mode: checking for git and docker..." false
+            for DEP in "${DEPENDENCIES[@]}"; do
+                if ! command -v "$DEP" &>/dev/null; then
+                    MISSING_DEPENDENCIES+=("$DEP")
+                fi
+            done
+        else
+            # In standard mode, check for build tools and server management tools
+            local DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc")
+            print_message $CYAN "Standard mode: checking for build and server tools..." false
+            for DEP in "${DEPENDENCIES[@]}"; do
+                if ! command -v "$DEP" &>/dev/null; then
+                    MISSING_DEPENDENCIES+=("$DEP")
+                fi
+            done
         fi
 
         # Evaluate if dependencies are met
