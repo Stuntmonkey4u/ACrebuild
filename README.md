@@ -14,12 +14,14 @@ The script intelligently adapts to your setup, supporting both traditional (loca
   - **Dependency Checks**: Only checks for relevant dependencies (`git` and `docker` for Docker mode, `cmake`, `clang`, etc., for standard mode).
   - **Prompts & Error Handling**: Hides irrelevant questions (like CPU core count in Docker) and provides mode-specific, helpful advice on build failures.
 - **External Configuration**: All settings are stored in `~/.ACrebuild/ACrebuild.conf` for easy persistence and manual editing.
+- **Configuration Validation**: A dedicated menu option to validate your settings, checking for valid paths and verifying the database connection to catch errors proactively.
 
 #### Core Functionality
 - **Update Source Code**: Pulls the latest changes for your AzerothCore source from its Git repository.
 - **Rebuild Server**: Manages the `cmake`/`make` process for standard builds and `docker compose build` for Docker builds.
 - **Process Management**: Start, stop, restart, and check the status of `authserver` and `worldserver`. The "Restart" command intelligently starts stopped containers instead of failing.
 - **Module Management**:
+  - **Interactive Module Installation**: Install new modules easily by simply providing a Git URL. The script handles cloning and SQL installation.
   - **Update Modules**: Recursively runs `git pull` on all modules in your `modules` folder.
   - **Automated SQL Installation**: After updating a module, the script automatically detects new `.sql` files and offers to import them into the correct database, saving a tedious manual step.
 
