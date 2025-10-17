@@ -55,9 +55,8 @@ setup_backup_schedule() {
     esac
 
     # Construct the command to be run
-    local script_path
-    script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/ACrebuild.sh"
-    local command_to_run="cd $(dirname "$script_path") && $script_path --run-backup"
+    local script_path="$SCRIPT_DIR_PATH/ACrebuild.sh"
+    local command_to_run="cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup"
 
     # Remove any existing backup job for this script
     (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
