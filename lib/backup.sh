@@ -115,7 +115,8 @@ create_backup() {
                         return 1
                     fi
                     sleep 1
-                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+                    echo -ne "
+${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
                 done
                 echo "" # Newline after spinner
             else
@@ -226,102 +227,149 @@ create_backup() {
 
 restore_backup() {
     print_message $BLUE "--- Starting Restore Process ---" true
-    list_backups || return 1
 
-    print_message $YELLOW "Enter the number of the backup to restore:" true
-    read -r backup_choice
-    [[ "$backup_choice" == "0" ]] && return 0
-    if ! [[ "$backup_choice" =~ ^[0-9]+$ ]] || [ "$backup_choice" -lt 1 ] || [ "$backup_choice" -gt ${#BACKUP_FILES[@]} ]; then
-        print_message $RED "Invalid selection." true
-        return 1
+    local db_started_by_script=false
+    local restore_result=0
+
+    # For Docker, check if the database is running and offer to start it.
+    if is_docker_setup; then
+        cd "$AZEROTHCORE_DIR" || { print_message $RED "Cannot find AzerothCore directory. Aborting." true; return 1; }
+        local db_status
+        db_status=$(docker inspect --format="{{.State.Status}}" ac-database 2>/dev/null)
+
+        if [ "$db_status" != "running" ]; then
+            print_message $YELLOW "The 'ac-database' container is not running." true
+            print_message $YELLOW "It must be running to restore a backup. Would you like to start it temporarily? (y/n)" true
+            read -r start_db_choice
+            if [[ "$start_db_choice" =~ ^[Yy]$ ]]; then
+                print_message $CYAN "Starting 'ac-database' container..." false
+                docker compose up -d ac-database || { print_message $RED "Failed to start ac-database container. Aborting restore." true; return 1; }
+                db_started_by_script=true
+                # Wait for health
+                # (Duplicating the health check logic from create_backup)
+                print_message $CYAN "Waiting for database to become healthy (max 120 seconds)..." false
+                local health_timer=0
+                local max_health_wait=120
+                while true; do
+                    local health_status
+                    health_status=$(docker inspect --format="{{.State.Health.Status}}" ac-database 2>/dev/null)
+                    if [ "$health_status" = "healthy" ]; then
+                        print_message $GREEN "Database is healthy." false
+                        break
+                    fi
+                    health_timer=$((health_timer + 1))
+                    if [ "$health_timer" -gt "$max_health_wait" ]; then
+                        print_message $RED "Database did not become healthy within $max_health_wait seconds. Aborting restore." true
+                        if [ "$db_started_by_script" = true ]; then docker compose stop ac-database &>/dev/null; fi
+                        return 1
+                    fi
+                    sleep 1
+                    echo -ne "
+${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+                done
+                echo ""
+            else
+                print_message $RED "Restore aborted by user because database container is not running." true
+                return 1
+            fi
+        fi
     fi
 
-    SELECTED_BACKUP_FILE="${BACKUP_FILES[$((backup_choice-1))]}"
-    print_message $CYAN "You selected to restore: $(basename "$SELECTED_BACKUP_FILE")" false
+    # Subshell for the main restore logic
+    (
+        list_backups || return 1
 
-    # ... (password logic similar to create_backup) ...
-    local effective_db_pass="$DB_PASS"
-    if [ -z "$effective_db_pass" ]; then
-        print_message $YELLOW "Enter DB password for user '$DB_USER':" true
-        read -s effective_db_pass
-        echo ""
-    fi
-
-    # Add a pre-restore backup prompt for safety
-    echo ""
-    print_message $YELLOW "It is recommended to back up your current databases before restoring." true
-    print_message $YELLOW "Would you like to create a backup of your current state now? (y/n)" true
-    read -r backup_first_choice
-    if [[ "$backup_first_choice" =~ ^[Yy]$ ]]; then
-        print_message $BLUE "--- Starting Pre-Restore Backup ---" true
-        create_backup
-        if [ $? -ne 0 ]; then
-            print_message $RED "Pre-restore backup failed. Aborting restore process to ensure safety." true
+        print_message $YELLOW "Enter the number of the backup to restore:" true
+        read -r backup_choice
+        [[ "$backup_choice" == "0" ]] && return 0
+        if ! [[ "$backup_choice" =~ ^[0-9]+$ ]] || [ "$backup_choice" -lt 1 ] || [ "$backup_choice" -gt ${#BACKUP_FILES[@]} ]; then
+            print_message $RED "Invalid selection." true
             return 1
         fi
-        print_message $GREEN "--- Pre-Restore Backup Completed ---" true
-    else
-        print_message $CYAN "Skipping pre-restore backup." false
-    fi
 
-    echo ""
-    print_message $RED "WARNING: This will overwrite your current databases and configuration files." true
-    print_message $YELLOW "Are you absolutely sure you want to continue with the restore? (y/n)" true
-    read -r confirmation
-    [[ ! "$confirmation" =~ ^[Yy]$ ]] && { print_message $GREEN "Restore aborted by user." true; return 1; }
+        SELECTED_BACKUP_FILE="${BACKUP_FILES[$((backup_choice-1))]}"
+        print_message $CYAN "You selected to restore: $(basename "$SELECTED_BACKUP_FILE")" false
 
-    TEMP_RESTORE_DIR="$BACKUP_DIR/restore_temp_$(date +"%Y%m%d_%H%M%S")"
-    mkdir -p "$TEMP_RESTORE_DIR" || { print_message $RED "Failed to create temp directory." true; return 1; }
-
-    print_message $CYAN "Extracting backup archive..." false
-    tar -xzf "$SELECTED_BACKUP_FILE" -C "$TEMP_RESTORE_DIR" || { print_message $RED "Error extracting archive." true; rm -rf "$TEMP_RESTORE_DIR"; return 1; }
-
-    EXTRACTED_CONTENT_DIR=$(find "$TEMP_RESTORE_DIR" -mindepth 1 -maxdepth 1 -type d)
-    if [ -z "$EXTRACTED_CONTENT_DIR" ]; then
-        print_message $RED "Could not find extracted content directory." true
-        rm -rf "$TEMP_RESTORE_DIR"
-        return 1
-    fi
-
-    DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
-    for DB_NAME in "${DATABASES[@]}"; do
-        SQL_FILE="$EXTRACTED_CONTENT_DIR/$DB_NAME.sql"
-        if [ ! -f "$SQL_FILE" ]; then
-            print_message $YELLOW "Warning: SQL file for $DB_NAME not found. Skipping." false
-            continue
+        local effective_db_pass="$DB_PASS"
+        if [ -z "$effective_db_pass" ]; then
+            print_message $YELLOW "Enter DB password for user '$DB_USER':" true
+            read -s effective_db_pass
+            echo ""
         fi
-        print_message $CYAN "Restoring database: $DB_NAME..." false
 
         local restore_failed=false
         if is_docker_setup; then
             # Use -i for stdin, -T to disable tty, and MYSQL_PWD for password
             cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
         else
-            # Use environment variable for password
-            cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+            print_message $CYAN "Skipping pre-restore backup." false
         fi
 
-        if [ "$restore_failed" = true ]; then
-            print_message $RED "Error restoring database $DB_NAME." true
+        echo ""
+        print_message $RED "WARNING: This will overwrite your current databases and configuration files." true
+        print_message $YELLOW "Are you absolutely sure you want to continue with the restore? (y/n)" true
+        read -r confirmation
+        [[ ! "$confirmation" =~ ^[Yy]$ ]] && { print_message $GREEN "Restore aborted by user." true; return 1; }
+
+        TEMP_RESTORE_DIR="$BACKUP_DIR/restore_temp_$(date +"%Y%m%d_%H%M%S")"
+        mkdir -p "$TEMP_RESTORE_DIR" || { print_message $RED "Failed to create temp directory." true; return 1; }
+
+        print_message $CYAN "Extracting backup archive..." false
+        tar -xzf "$SELECTED_BACKUP_FILE" -C "$TEMP_RESTORE_DIR" || { print_message $RED "Error extracting archive." true; rm -rf "$TEMP_RESTORE_DIR"; return 1; }
+
+        EXTRACTED_CONTENT_DIR=$(find "$TEMP_RESTORE_DIR" -mindepth 1 -maxdepth 1 -type d)
+        if [ -z "$EXTRACTED_CONTENT_DIR" ]; then
+            print_message $RED "Could not find extracted content directory." true
             rm -rf "$TEMP_RESTORE_DIR"
             return 1
-        else
-            print_message $GREEN "Database $DB_NAME restored successfully." false
         fi
-    done
 
-    print_message $CYAN "Restoring server configuration files..." false
-    mkdir -p "$SERVER_CONFIG_DIR_PATH" || { print_message $RED "Failed to create server config dir." true; rm -rf "$TEMP_RESTORE_DIR"; return 1; }
-    for CONFIG_FILE in "${SERVER_CONFIG_FILES[@]}"; do
-        if [ -f "$EXTRACTED_CONTENT_DIR/$CONFIG_FILE" ]; then
-            cp "$EXTRACTED_CONTENT_DIR/$CONFIG_FILE" "$SERVER_CONFIG_DIR_PATH/"
-            print_message $GREEN "Config file $CONFIG_FILE restored." false
-        fi
-    done
+        DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
+        for DB_NAME in "${DATABASES[@]}"; do
+            SQL_FILE="$EXTRACTED_CONTENT_DIR/$DB_NAME.sql"
+            if [ ! -f "$SQL_FILE" ]; then
+                print_message $YELLOW "Warning: SQL file for $DB_NAME not found. Skipping." false
+                continue
+            fi
+            print_message $CYAN "Restoring database: $DB_NAME..." false
+            local restore_failed=false
+            if is_docker_setup; then
+                cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+            else
+                cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+            fi
+            if [ "$restore_failed" = true ]; then
+                print_message $RED "Error restoring database $DB_NAME." true
+                rm -rf "$TEMP_RESTORE_DIR"
+                return 1
+            else
+                print_message $GREEN "Database $DB_NAME restored successfully." false
+            fi
+        done
 
-    rm -rf "$TEMP_RESTORE_DIR"
-    print_message $GREEN "Restore process completed successfully." true
-    echo ""
-    read -n 1 -s -r -p "Press any key to return..."
-    echo ""
+        print_message $CYAN "Restoring server configuration files..." false
+        mkdir -p "$SERVER_CONFIG_DIR_PATH" || { print_message $RED "Failed to create server config dir." true; rm -rf "$TEMP_RESTORE_DIR"; return 1; }
+        for CONFIG_FILE in "${SERVER_CONFIG_FILES[@]}"; do
+            if [ -f "$EXTRACTED_CONTENT_DIR/$CONFIG_FILE" ]; then
+                cp "$EXTRACTED_CONTENT_DIR/$CONFIG_FILE" "$SERVER_CONFIG_DIR_PATH/"
+                print_message $GREEN "Config file $CONFIG_FILE restored." false
+            fi
+        done
+
+        rm -rf "$TEMP_RESTORE_DIR"
+        print_message $GREEN "Restore process completed successfully." true
+        echo ""
+        read -n 1 -s -r -p "Press any key to return..."
+        echo ""
+        return 0
+    )
+    restore_result=$?
+
+    if [ "$db_started_by_script" = true ]; then
+        print_message $CYAN "Stopping 'ac-database' container as it was started for the restore..." false
+        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        print_message $GREEN "Container 'ac-database' stopped." false
+    fi
+
+    return $restore_result
 }

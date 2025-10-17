@@ -8,8 +8,10 @@ source ./lib/dependencies.sh
 source ./lib/update.sh
 source ./lib/server.sh
 source ./lib/backup.sh
+source ./lib/database.sh
 source ./lib/logging.sh
 source ./lib/ui.sh
+source ./lib/wizard.sh
 
 # Main function to start the script
 main_menu() {
@@ -27,9 +29,6 @@ main_menu() {
 
     # Check for dependencies
     check_dependencies
-
-    # Ask for core installation path (which now uses/updates config)
-    ask_for_core_installation_path
 
     # Check for potential docker setup and prompt user if needed
     check_and_prompt_for_docker_usage

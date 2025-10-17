@@ -21,6 +21,7 @@ CONFIG_FILE="${CONFIG_DIR}/ACrebuild.conf"
 DEFAULT_AZEROTHCORE_DIR="/root/azerothcore-wotlk"
 DEFAULT_BACKUP_DIR="${HOME}/ac_backups"
 DEFAULT_DB_USER="acore"
+DEFAULT_DB_USER_DOCKER="root" # Docker-specific default user
 DEFAULT_DB_PASS=""
 DEFAULT_AUTH_DB_NAME="acore_auth"
 DEFAULT_CHAR_DB_NAME="acore_characters"
