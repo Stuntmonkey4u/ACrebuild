@@ -64,7 +64,9 @@ main_menu() {
                 run_tmux_session # This function now exits the script.
             elif [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
                 # This case is for "Rebuild Only" - run temporary authserver
-                run_authserver # This function no longer exits, returns to main_menu loop.
+                if ! is_docker_setup; then
+                    run_authserver # This function no longer exits, returns to main_menu loop.
+                fi
             fi
         # This case handles when only module update was chosen and completed.
         # Or if an invalid main menu choice was entered and returned.

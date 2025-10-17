@@ -555,23 +555,30 @@ build_and_install_with_spinner() {
     print_message $BLUE "--- Starting AzerothCore Build and Installation ---" true
     print_message $YELLOW "Building and installing AzerothCore... This may take a while." true
 
-    # Ensure BUILD_DIR is correctly updated
-    if [ ! -d "$BUILD_DIR" ]; then
-        handle_error "Build directory $BUILD_DIR does not exist. Please check your AzerothCore path."
+    if is_docker_setup; then
+        print_message $CYAN "Running Docker build..." true
+        cd "$AZEROTHCORE_DIR" || handle_error "Failed to change directory to $AZEROTHCORE_DIR"
+        docker compose build || handle_error "Docker build failed. Check the output above for details."
+        print_message $GREEN "--- Docker Build Process Completed Successfully ---" true
+    else
+        # Ensure BUILD_DIR is correctly updated
+        if [ ! -d "$BUILD_DIR" ]; then
+            handle_error "Build directory $BUILD_DIR does not exist. Please check your AzerothCore path."
+        fi
+
+        # Run cmake with the provided options
+        cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR. Ensure the path is correct."
+
+        echo ""
+        print_message $CYAN "Running CMake configuration..." true
+        cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed. Check CMake logs in $BUILD_DIR for details."
+
+        echo ""
+        print_message $CYAN "Running make install with $CORES core(s)..." true
+        make -j "$CORES" install || handle_error "Build process ('make install') failed. Check the output above and logs in $BUILD_DIR for details."
+        echo ""
+        print_message $GREEN "--- AzerothCore Build and Installation Completed Successfully ---" true
     fi
-
-    # Run cmake with the provided options
-    cd "$BUILD_DIR" || handle_error "Failed to change directory to $BUILD_DIR. Ensure the path is correct."
-
-    echo ""
-    print_message $CYAN "Running CMake configuration..." true
-    cmake ../ -DCMAKE_INSTALL_PREFIX="$AZEROTHCORE_DIR/env/dist/" -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ -DWITH_WARNINGS=1 -DTOOLS_BUILD=all -DSCRIPTS=static -DMODULES=static || handle_error "CMake configuration failed. Check CMake logs in $BUILD_DIR for details."
-
-    echo ""
-    print_message $CYAN "Running make install with $CORES core(s)..." true
-    make -j "$CORES" install || handle_error "Build process ('make install') failed. Check the output above and logs in $BUILD_DIR for details."
-    echo ""
-    print_message $GREEN "--- AzerothCore Build and Installation Completed Successfully ---" true
 }
 
 # Function to run authserver for 60 seconds with countdown

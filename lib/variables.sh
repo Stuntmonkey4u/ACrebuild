@@ -18,7 +18,7 @@ CONFIG_DIR="${HOME}/.ACrebuild"
 CONFIG_FILE="${CONFIG_DIR}/ACrebuild.conf"
 
 # Default values for configuration
-DEFAULT_AZEROTHCORE_DIR="${HOME}/azerothcore"
+DEFAULT_AZEROTHCORE_DIR="/root/azerothcore-wotlk"
 DEFAULT_BACKUP_DIR="${HOME}/ac_backups"
 DEFAULT_DB_USER="acore"
 DEFAULT_DB_PASS=""
