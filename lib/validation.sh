@@ -36,11 +36,18 @@ validate_settings() {
             db_started_by_script=true
         fi
 
+        local effective_db_pass="$DB_PASS"
+        if [ -z "$effective_db_pass" ]; then
+            print_message $YELLOW "Database password is not saved. Please enter it for validation:" true
+            read -s effective_db_pass
+            echo ""
+        fi
+
         # Try to connect
         if is_docker_setup; then
-            docker compose exec -T -e MYSQL_PWD="$DB_PASS" ac-database mysql -u"$DB_USER" -e "QUIT" &>/dev/null
+            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" -e "QUIT" &>/dev/null
         else
-            MYSQL_PWD="$DB_PASS" mysql -u"$DB_USER" -e "QUIT" &>/dev/null
+            MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" -e "QUIT" &>/dev/null
         fi
 
         if [ $? -eq 0 ]; then
