@@ -67,8 +67,6 @@ create_backup_dry_run() {
 
     print_message $GREEN "--- Backup Dry Run Completed Successfully ---" true
     echo ""
-    read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
-    echo ""
 }
 
 create_backup() {
@@ -115,8 +113,7 @@ create_backup() {
                         return 1
                     fi
                     sleep 1
-                    echo -ne "
-${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
                 done
                 echo "" # Newline after spinner
             else
@@ -208,9 +205,6 @@ ${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)$
 
         rm -rf "$BACKUP_SUBDIR"
         print_message $GREEN "Backup process completed successfully." true
-        echo ""
-        read -n 1 -s -r -p "Press any key to return..."
-        echo ""
         return 0
     )
     backup_result=$? # Capture the exit code of the backup logic
@@ -264,8 +258,7 @@ restore_backup() {
                         return 1
                     fi
                     sleep 1
-                    echo -ne "
-${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
                 done
                 echo ""
             else
@@ -297,10 +290,18 @@ ${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)$
             echo ""
         fi
 
-        local restore_failed=false
-        if is_docker_setup; then
-            # Use -i for stdin, -T to disable tty, and MYSQL_PWD for password
-            cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+        echo ""
+        print_message $YELLOW "It is recommended to back up your current databases before restoring." true
+        print_message $YELLOW "Would you like to create a backup of your current state now? (y/n)" true
+        read -r backup_first_choice
+        if [[ "$backup_first_choice" =~ ^[Yy]$ ]]; then
+            print_message $BLUE "--- Starting Pre-Restore Backup ---" true
+            create_backup
+            if [ $? -ne 0 ]; then
+                print_message $RED "Pre-restore backup failed. Aborting restore process to ensure safety." true
+                return 1
+            fi
+            print_message $GREEN "--- Pre-Restore Backup Completed ---" true
         else
             print_message $CYAN "Skipping pre-restore backup." false
         fi
@@ -358,9 +359,6 @@ ${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)$
 
         rm -rf "$TEMP_RESTORE_DIR"
         print_message $GREEN "Restore process completed successfully." true
-        echo ""
-        read -n 1 -s -r -p "Press any key to return..."
-        echo ""
         return 0
     )
     restore_result=$?
