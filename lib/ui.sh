@@ -46,12 +46,13 @@ show_menu() {
     print_message $YELLOW "  [6] Backup/Restore Options        (Shortcut: B)" false
     print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
     print_message $YELLOW "  [8] Database Console              (Shortcut: D)" false
-    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
     echo ""
     print_message $CYAN " Script Maintenance:" true
+    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
         print_message $YELLOW "  [10] Self-Update ACrebuild Script (Shortcut: A)" false
     fi
+    echo ""
     print_message $CYAN " Exit:" true
     print_message $YELLOW "  [11] Quit Script                  (Shortcut: Q)" false
     echo ""
