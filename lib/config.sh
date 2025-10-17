@@ -85,14 +85,10 @@ save_config_value() {
     local value_to_save="$2"
     local temp_config_file="$CONFIG_DIR/ACrebuild.conf.tmp"
 
-    # Check if config file exists, if not, something is wrong (should have been created by load_config)
+    # If the config file doesn't exist, create it silently.
     if [ ! -f "$CONFIG_FILE" ]; then
-        print_message $RED "Error: Config file $CONFIG_FILE not found. Cannot save value." true
-        create_default_config # Attempt to recreate it
-        if [ ! -f "$CONFIG_FILE" ]; then
-             print_message $RED "Failed to recreate config file. Save aborted." true
-             return 1
-        fi
+        touch "$CONFIG_FILE" || { print_message $RED "FATAL: Could not create config file $CONFIG_FILE." true; return 1; }
+        chmod 600 "$CONFIG_FILE" &>/dev/null
     fi
 
     # Escape common special characters in the value for sed: \, &, /, newline
@@ -126,77 +122,6 @@ save_config_value() {
         fi
     fi
     return 0
-}
-
-# Function to create the default configuration file
-create_default_config() {
-    print_message $CYAN "Creating default configuration file at $CONFIG_FILE..." true
-
-    # Ensure CONFIG_DIR exists
-    mkdir -p "$CONFIG_DIR" || { print_message $RED "FATAL: Could not create config directory $CONFIG_DIR. Exiting." true; exit 1; }
-
-    cat > "$CONFIG_FILE" << EOF
-# ACrebuild Configuration File
-# This file stores settings for the AzerothCore Rebuild script.
-# Lines starting with # are comments.
-
-# Path to your AzerothCore installation directory
-AZEROTHCORE_DIR="$DEFAULT_AZEROTHCORE_DIR"
-
-# Path to your backup directory
-BACKUP_DIR="$DEFAULT_BACKUP_DIR"
-
-# Database credentials
-DB_USER="$DEFAULT_DB_USER"
-DB_PASS="$DEFAULT_DB_PASS" # Leave empty to be prompted (recommended for security)
-AUTH_DB_NAME="$DEFAULT_AUTH_DB_NAME"
-CHAR_DB_NAME="$DEFAULT_CHAR_DB_NAME"
-WORLD_DB_NAME="$DEFAULT_WORLD_DB_NAME"
-
-# Suffix for the server configuration directory (relative to AZEROTHCORE_DIR)
-# Example: env/dist/etc
-SERVER_CONFIG_DIR_PATH_SUFFIX="$DEFAULT_SERVER_CONFIG_DIR_PATH_SUFFIX"
-
-# Suffix for the server log directory (relative to AZEROTHCORE_DIR)
-# Example: env/dist/logs
-SERVER_LOG_DIR_PATH_SUFFIX="$DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX"
-
-# Filename for the auth server log (located in SERVER_LOG_DIR_PATH)
-AUTH_SERVER_LOG_FILENAME="$DEFAULT_AUTH_SERVER_LOG_FILENAME"
-
-# Filename for the world server log (located in SERVER_LOG_DIR_PATH)
-WORLD_SERVER_LOG_FILENAME="$DEFAULT_WORLD_SERVER_LOG_FILENAME"
-
-# Filename for the server errors log (located in SERVER_LOG_DIR_PATH)
-ERROR_LOG_FILENAME="$DEFAULT_ERROR_LOG_FILENAME"
-
-# Directory for the ACrebuild script's own log files
-SCRIPT_LOG_DIR="$DEFAULT_SCRIPT_LOG_DIR"
-
-# Filename for the ACrebuild script's log file
-SCRIPT_LOG_FILENAME="$DEFAULT_SCRIPT_LOG_FILENAME"
-
-# Number of CPU cores to use for building AzerothCore
-# Leave empty or set to a number (e.g., 4). If empty, script will ask or use all available.
-CORES_FOR_BUILD="$DEFAULT_CORES_FOR_BUILD"
-
-# Number of seconds to wait after port 8085 is free before force-closing server panes.
-# This allows extra time for database writes or other cleanup tasks.
-POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
-
-# Set to 'true' to enable Docker mode, 'false' otherwise.
-# If this is true, the script will use 'docker compose' for server management.
-USE_DOCKER="$DEFAULT_USE_DOCKER"
-EOF
-    local cat_exit_code=$?
-    if [ $cat_exit_code -eq 0 ]; then
-        print_message $GREEN "Default configuration file created successfully." true
-        # Set permissions to 600 (read/write for owner only) for security
-        chmod 600 "$CONFIG_FILE" 2>/dev/null || print_message $YELLOW "Warning: Could not set permissions for $CONFIG_FILE. Please set them manually to 600." false
-    else
-        print_message $RED "Error creating default configuration file. Please check permissions for $CONFIG_DIR." true
-        # Not exiting here, load_config will handle the error if file is unusable
-    fi
 }
 
 # Function to ask the user where their AzerothCore is installed

@@ -71,6 +71,5 @@ run_setup_wizard() {
     print_message $GREEN "--- Initial Setup Complete! ---" true
     print_message $CYAN "Your settings have been saved to $CONFIG_FILE" false
     print_message $CYAN "You can change these settings later from the Configuration menu." false
-    echo ""
-    read -n 1 -s -r -p "Press any key to continue to the main menu..."
+    sleep 2
 }
