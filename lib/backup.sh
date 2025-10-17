@@ -74,92 +74,154 @@ create_backup_dry_run() {
 create_backup() {
     print_message $BLUE "--- Starting Backup Creation ---" true
 
-    local current_db_user="$DB_USER"
-    if [ -z "$current_db_user" ]; then
-        print_message $YELLOW "Database username is not set. Enter the database username (e.g., acore):" true
-        read -r db_user_input
-        if [ -n "$db_user_input" ]; then
-            DB_USER="$db_user_input"
-            if [[ "$save_choice" =~ ^[Yy]$ ]]; then
-                save_config_value "DB_USER" "$DB_USER"
+    local db_started_by_script=false
+    local backup_result=0
+
+    # For Docker, check if the database is running and offer to start it.
+    if is_docker_setup; then
+        # Ensure we're in the right directory for docker compose commands
+        cd "$AZEROTHCORE_DIR" || { print_message $RED "Cannot find AzerothCore directory. Aborting." true; return 1; }
+
+        local db_status
+        db_status=$(docker inspect --format="{{.State.Status}}" ac-database 2>/dev/null)
+
+        if [ "$db_status" != "running" ]; then
+            print_message $YELLOW "The 'ac-database' container is not running." true
+            print_message $YELLOW "Would you like to start it temporarily for the backup? (y/n)" true
+            read -r start_db_choice
+            if [[ "$start_db_choice" =~ ^[Yy]$ ]]; then
+                print_message $CYAN "Starting 'ac-database' container..." false
+                docker compose up -d ac-database || { print_message $RED "Failed to start ac-database container. Aborting backup." true; return 1; }
+                db_started_by_script=true
+
+                print_message $CYAN "Waiting for database to become healthy (max 120 seconds)..." false
+                local health_timer=0
+                local max_health_wait=120
+                while true; do
+                    local health_status
+                    health_status=$(docker inspect --format="{{.State.Health.Status}}" ac-database 2>/dev/null)
+                    if [ "$health_status" = "healthy" ]; then
+                        print_message $GREEN "Database is healthy." false
+                        break
+                    fi
+
+                    health_timer=$((health_timer + 1))
+                    if [ "$health_timer" -gt "$max_health_wait" ]; then
+                        print_message $RED "Database did not become healthy within $max_health_wait seconds. Aborting backup." true
+                        # Stop the container if we started it
+                        if [ "$db_started_by_script" = true ]; then
+                            docker compose stop ac-database &>/dev/null
+                        fi
+                        return 1
+                    fi
+                    sleep 1
+                    echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+                done
+                echo "" # Newline after spinner
+            else
+                print_message $RED "Backup aborted by user because database container is not running." true
+                return 1
             fi
-        else
-            print_message $RED "Database username cannot be empty for backup. Aborting." true
-            return 1
         fi
     fi
 
-    local effective_db_pass=""
-    if [ -z "$DB_PASS" ]; then
-        print_message $YELLOW "Enter the database password for user '$DB_USER':" true
-        read -s new_db_pass
-        echo ""
-        effective_db_pass="$new_db_pass"
-        if [ -n "$effective_db_pass" ]; then
-            print_message $YELLOW "Save this database password to configuration? (Not Recommended)" true
-            read -r save_pass_choice
-            if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
-                save_config_value "DB_PASS" "$effective_db_pass"
-                DB_PASS="$effective_db_pass"
+    # Subshell to contain the main backup logic and capture its exit code
+    (
+        local current_db_user="$DB_USER"
+        if [ -z "$current_db_user" ]; then
+            print_message $YELLOW "Database username is not set. Enter the database username (e.g., acore):" true
+            read -r db_user_input
+            if [ -n "$db_user_input" ]; then
+                DB_USER="$db_user_input"
+                # Note: This doesn't offer to save, adjust if needed
+            else
+                print_message $RED "Database username cannot be empty for backup. Aborting." true
+                return 1
             fi
         fi
-    else
-        print_message $CYAN "Using saved database password for user '$DB_USER'." false
-        effective_db_pass="$DB_PASS"
-    fi
 
-    mkdir -p "$BACKUP_DIR" || { print_message $RED "Failed to create backup directory." true; return 1; }
-    TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-    BACKUP_SUBDIR="$BACKUP_DIR/backup_$TIMESTAMP"
-    mkdir -p "$BACKUP_SUBDIR" || { print_message $RED "Failed to create timestamped backup subdirectory." true; return 1; }
-    print_message $GREEN "Created backup subdirectory: $BACKUP_SUBDIR" false
-
-    DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
-    for DB_NAME in "${DATABASES[@]}"; do
-        print_message $CYAN "Backing up database: $DB_NAME..." false
-        local backup_failed=false
-        if is_docker_setup; then
-            # Use environment variable for password to avoid process list exposure
-            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+        local effective_db_pass=""
+        if [ -z "$DB_PASS" ]; then
+            print_message $YELLOW "Enter the database password for user '$DB_USER':" true
+            read -s new_db_pass
+            echo ""
+            effective_db_pass="$new_db_pass"
+            # Offer to save if not already set
+            if [ -n "$effective_db_pass" ]; then
+                print_message $YELLOW "Save this database password to configuration? (Not Recommended)" true
+                read -r save_pass_choice
+                if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
+                    save_config_value "DB_PASS" "$effective_db_pass"
+                    DB_PASS="$effective_db_pass"
+                fi
+            fi
         else
-            # Use environment variable for password to avoid process list exposure
-            MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+            print_message $CYAN "Using saved database password for user '$DB_USER'." false
+            effective_db_pass="$DB_PASS"
         fi
 
-        if [ "$backup_failed" = true ]; then
-            print_message $RED "Error backing up database $DB_NAME." true
+        mkdir -p "$BACKUP_DIR" || { print_message $RED "Failed to create backup directory." true; return 1; }
+        TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+        BACKUP_SUBDIR="$BACKUP_DIR/backup_$TIMESTAMP"
+        mkdir -p "$BACKUP_SUBDIR" || { print_message $RED "Failed to create timestamped backup subdirectory." true; return 1; }
+        print_message $GREEN "Created backup subdirectory: $BACKUP_SUBDIR" false
+
+        DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
+        for DB_NAME in "${DATABASES[@]}"; do
+            print_message $CYAN "Backing up database: $DB_NAME..." false
+            local backup_failed=false
+            if is_docker_setup; then
+                docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+            else
+                MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+            fi
+
+            if [ "$backup_failed" = true ]; then
+                print_message $RED "Error backing up database $DB_NAME." true
+                rm -rf "$BACKUP_SUBDIR"
+                return 1
+            else
+                print_message $GREEN "Database $DB_NAME backed up successfully." false
+            fi
+        done
+
+        print_message $CYAN "Backing up server configuration files..." false
+        for CONFIG_FILE in "${SERVER_CONFIG_FILES[@]}"; do
+            if [ -f "$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE" ]; then
+                cp "$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE" "$BACKUP_SUBDIR/"
+                print_message $GREEN "Configuration file $CONFIG_FILE backed up." false
+            else
+                print_message $YELLOW "Warning: Config file $SERVER_CONFIG_DIR_PATH/$CONFIG_FILE not found." false
+            fi
+        done
+
+        ARCHIVE_NAME="backup_$TIMESTAMP.tar.gz"
+        print_message $CYAN "Creating archive $ARCHIVE_NAME..." false
+        if tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" -C "$BACKUP_DIR" "backup_$TIMESTAMP"; then
+            print_message $GREEN "Archive $ARCHIVE_NAME created successfully." false
+        else
+            print_message $RED "Error creating archive $ARCHIVE_NAME." true
             rm -rf "$BACKUP_SUBDIR"
             return 1
-        else
-            print_message $GREEN "Database $DB_NAME backed up successfully." false
         fi
-    done
 
-    print_message $CYAN "Backing up server configuration files..." false
-    for CONFIG_FILE in "${SERVER_CONFIG_FILES[@]}"; do
-        if [ -f "$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE" ]; then
-            cp "$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE" "$BACKUP_SUBDIR/"
-            print_message $GREEN "Configuration file $CONFIG_FILE backed up." false
-        else
-            print_message $YELLOW "Warning: Config file $SERVER_CONFIG_DIR_PATH/$CONFIG_FILE not found." false
-        fi
-    done
-
-    ARCHIVE_NAME="backup_$TIMESTAMP.tar.gz"
-    print_message $CYAN "Creating archive $ARCHIVE_NAME..." false
-    if tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" -C "$BACKUP_DIR" "backup_$TIMESTAMP"; then
-        print_message $GREEN "Archive $ARCHIVE_NAME created successfully." false
-    else
-        print_message $RED "Error creating archive $ARCHIVE_NAME." true
         rm -rf "$BACKUP_SUBDIR"
-        return 1
+        print_message $GREEN "Backup process completed successfully." true
+        echo ""
+        read -n 1 -s -r -p "Press any key to return..."
+        echo ""
+        return 0
+    )
+    backup_result=$? # Capture the exit code of the backup logic
+
+    # Cleanup: Stop the database container if we started it
+    if [ "$db_started_by_script" = true ]; then
+        print_message $CYAN "Stopping 'ac-database' container as it was started for the backup..." false
+        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        print_message $GREEN "Container 'ac-database' stopped." false
     fi
 
-    rm -rf "$BACKUP_SUBDIR"
-    print_message $GREEN "Backup process completed successfully." true
-    echo ""
-    read -n 1 -s -r -p "Press any key to return..."
-    echo ""
+    return $backup_result
 }
 
 restore_backup() {
