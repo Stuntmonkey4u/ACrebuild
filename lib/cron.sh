@@ -56,7 +56,8 @@ setup_backup_schedule() {
 
     # Construct the command to be run
     local script_path="$SCRIPT_DIR_PATH/ACrebuild.sh"
-    local command_to_run="cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup"
+    # Wrap the command in `bash -l -c` to ensure it runs in a login shell with the user's full environment
+    local command_to_run="bash -l -c \"cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup\""
 
     # Remove any existing backup job for this script
     (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
