@@ -3,6 +3,25 @@
 # A unique identifier for our cron job to find and manage it
 CRON_COMMENT_TAG="ACREBUILD_BACKUP_JOB"
 
+# Function to check if the cron service is running
+check_cron_service() {
+    if command -v systemctl &>/dev/null; then
+        if systemctl is-active --quiet cron || systemctl is-active --quiet crond; then
+            return 0 # Service is active
+        else
+            return 1 # Service is not active
+        fi
+    elif command -v pgrep &>/dev/null; then
+        if pgrep -x "cron" >/dev/null || pgrep -x "crond" >/dev/null; then
+            return 0 # Process is running
+        else
+            return 1 # Process is not running
+        fi
+    fi
+    # Fallback if no check method is available
+    return 2
+}
+
 # Function to setup the automated backup schedule
 setup_backup_schedule() {
     print_message $BLUE "--- Setup Automated Backup Schedule ---" true

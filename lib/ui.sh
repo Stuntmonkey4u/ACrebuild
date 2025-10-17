@@ -288,6 +288,17 @@ show_backup_restore_menu() {
 show_automated_backup_menu() {
     if ! command -v crontab &>/dev/null; then
         print_message $RED "Error: 'crontab' command not found. This feature is not supported on your system." true
+        read -n 1 -s -r -p "Press any key to return..."
+        return 1
+    fi
+
+    check_cron_service
+    local cron_status=$?
+    if [ $cron_status -ne 0 ]; then
+        print_message $RED "Error: The cron service is not running on your system." true
+        print_message $YELLOW "Automated backups cannot be scheduled without the cron daemon." true
+        print_message $YELLOW "On most systems, you can enable it with: sudo systemctl enable --now cron" true
+        read -n 1 -s -r -p "Press any key to return..."
         return 1
     fi
 
