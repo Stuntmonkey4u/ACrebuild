@@ -56,7 +56,7 @@ WORLD_DB_NAME=""
 SERVER_CONFIG_DIR_PATH=""
 SERVER_LOG_DIR_PATH=""
 AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
-WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
+WORLD_SERVER_LOG_FILENAME="" # Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
 ERROR_LOG_FILENAME=""
 # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
