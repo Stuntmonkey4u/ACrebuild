@@ -110,3 +110,9 @@ view_error_log() {
         view_log_file "$full_error_log_path" "less"
     fi
 }
+
+view_cron_log() {
+    print_message $CYAN "Accessing automated backup log..." false
+    local cron_log_path="$SCRIPT_LOG_DIR/$DEFAULT_CRON_LOG_FILENAME"
+    view_log_file "$cron_log_path" "less"
+}

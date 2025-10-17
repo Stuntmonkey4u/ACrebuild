@@ -338,12 +338,15 @@ show_log_viewer_menu() {
         print_message $YELLOW "    [6] Live View Auth Server Log" false
         print_message $YELLOW "    [7] Live View World Server Log" false
         echo ""
-        print_message $YELLOW "  [8] Return to Main Menu" false
+        print_message $CYAN "  Cron/Scheduled Task Logs:" true
+        print_message $YELLOW "    [8] View Automated Backup Log" false
+        echo ""
+        print_message $YELLOW "  [9] Return to Main Menu" false
         echo ""
         print_message $BLUE "---------------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-8]: ${NC}")" log_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-9]: ${NC}")" log_choice
         case "$log_choice" in
             1) view_script_log ;;
             2) view_auth_log ;;
@@ -352,12 +355,13 @@ show_log_viewer_menu() {
             5) view_script_log_live ;;
             6) view_auth_log_live ;;
             7) view_world_log_live ;;
-            8)
+            8) view_cron_log ;;
+            9)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-8)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-9)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
