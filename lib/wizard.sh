@@ -70,6 +70,9 @@ run_setup_wizard() {
     backup_dir=${backup_dir:-$DEFAULT_BACKUP_DIR}
     save_config_value "BACKUP_DIR" "$backup_dir"
 
+    # 5. Silently save the current PATH for cron jobs
+    save_config_value "CRON_PATH" "$PATH"
+
     echo ""
     print_message $GREEN "--- Initial Setup Complete! ---" true
     print_message $CYAN "Your settings have been saved to $CONFIG_FILE" false

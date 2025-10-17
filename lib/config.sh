@@ -55,6 +55,7 @@ load_config() {
     POST_SHUTDOWN_DELAY_SECONDS="${POST_SHUTDOWN_DELAY_SECONDS:-$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS}"
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
     USE_DOCKER="${USE_DOCKER:-$DEFAULT_USE_DOCKER}"
+    CRON_PATH="${CRON_PATH:-$DEFAULT_CRON_PATH}"
 
     # --- Assign non-user-configurable variables from defaults ---
     AUTH_PORT="${DEFAULT_AUTH_PORT}"

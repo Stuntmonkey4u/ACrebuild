@@ -39,6 +39,7 @@ DEFAULT_AUTH_PORT=3724
 DEFAULT_WORLD_PORT=8085
 DEFAULT_CORES_FOR_BUILD=""
 DEFAULT_USE_DOCKER=false
+DEFAULT_CRON_PATH=""
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
 AZEROTHCORE_DIR=""

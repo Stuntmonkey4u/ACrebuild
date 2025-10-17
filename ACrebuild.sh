@@ -87,9 +87,11 @@ if [ "$1" == "--run-backup" ]; then
     source ./lib/variables.sh
     source ./lib/core.sh
     source ./lib/config.sh
+    source ./lib/dependencies.sh
     source ./lib/database.sh
     source ./lib/backup.sh
     load_config
+    check_dependencies
     create_backup --non-interactive
     exit 0
 fi
