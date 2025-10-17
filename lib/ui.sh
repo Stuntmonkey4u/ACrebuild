@@ -28,6 +28,10 @@ show_menu() {
     if is_docker_setup; then
         print_message $CYAN "     ✨ Docker Setup Detected ✨" true
     fi
+    # Update notification
+    if [ "$SCRIPT_UPDATE_AVAILABLE" = true ]; then
+        print_message $YELLOW "   ✨ An update is available for this script! ✨" true
+    fi
     echo ""
     print_message $YELLOW "Select an option:" true
     echo ""

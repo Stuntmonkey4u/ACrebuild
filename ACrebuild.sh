@@ -30,9 +30,6 @@ main_menu() {
     # Check for dependencies
     check_dependencies
 
-    # Ask for core installation path (which now uses/updates config)
-    ask_for_core_installation_path
-
     # Check for potential docker setup and prompt user if needed
     check_and_prompt_for_docker_usage
 

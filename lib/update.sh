@@ -87,11 +87,9 @@ check_for_script_updates() {
     # Compare the local HEAD commit with the remote HEAD commit.
     # If they are different, it means there's an update available.
     if [ "$LOCAL_HEAD" != "$REMOTE_HEAD" ]; then
-        # Use the existing print_message function to display the notification.
-        # $YELLOW is a predefined color variable in the script.
-        # The third argument 'false' means the message text will not be bold.
-        echo ""
-        print_message "$YELLOW" "An update is available to ACrebuild" false
+        SCRIPT_UPDATE_AVAILABLE=true
+    else
+        SCRIPT_UPDATE_AVAILABLE=false
     fi
 }
 

@@ -27,6 +27,7 @@ run_setup_wizard() {
         fi
     done
     save_config_value "AZEROTHCORE_DIR" "$ac_dir"
+    echo ""
 
     # 2. Ask about Docker Mode
     local use_docker
@@ -43,6 +44,7 @@ run_setup_wizard() {
          use_docker=false
     fi
     save_config_value "USE_DOCKER" "$use_docker"
+    echo ""
 
     # 3. Ask for Database User
     local db_user
@@ -58,6 +60,7 @@ run_setup_wizard() {
         db_user=${db_user:-$DEFAULT_DB_USER}
     fi
     save_config_value "DB_USER" "$db_user"
+    echo ""
 
     # 4. Ask for Backup Directory
     local backup_dir
