@@ -248,12 +248,13 @@ show_backup_restore_menu() {
         print_message $YELLOW "  [1] Create Backup" false
         print_message $YELLOW "  [2] Create Backup (Dry Run)" false
         print_message $YELLOW "  [3] Restore from Backup" false
-        print_message $YELLOW "  [4] Return to Main Menu" false
+        print_message $YELLOW "  [4] Manage Automated Backups" false
+        print_message $YELLOW "  [5] Return to Main Menu" false
         echo ""
         print_message $BLUE "-----------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" backup_choice
         case "$backup_choice" in
             1)
                 create_backup
@@ -265,17 +266,54 @@ show_backup_restore_menu() {
                 restore_backup
                 ;;
             4)
+                show_automated_backup_menu
+                ;;
+            5)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
         if [[ "$backup_choice" != "4" ]]; then
             read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
         fi
+    done
+}
+
+# Function to display the automated backup management menu
+show_automated_backup_menu() {
+    if ! command -v crontab &>/dev/null; then
+        print_message $RED "Error: 'crontab' command not found. This feature is not supported on your system." true
+        return 1
+    fi
+
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "========== AUTOMATED BACKUP MANAGEMENT ==========" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Setup or Change Schedule" false
+        print_message $YELLOW "  [2] View Current Schedule" false
+        print_message $YELLOW "  [3] Disable Automated Backups" false
+        print_message $YELLOW "  [4] Return to Backup/Restore Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_mgmt_choice
+        case "$backup_mgmt_choice" in
+            1) setup_backup_schedule ;;
+            2) view_backup_schedule ;;
+            3) disable_automated_backups ;;
+            4) break ;;
+            *) print_message $RED "Invalid choice. Please select a valid option." false ;;
+        esac
+        read -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
     done
 }
 

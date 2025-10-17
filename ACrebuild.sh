@@ -13,6 +13,7 @@ source ./lib/logging.sh
 source ./lib/ui.sh
 source ./lib/wizard.sh
 source ./lib/validation.sh
+source ./lib/cron.sh
 
 # Main function to start the script
 main_menu() {
@@ -79,6 +80,19 @@ main_menu() {
     done
 }
 
+
+# Check for command-line flags
+if [ "$1" == "--run-backup" ]; then
+    # Source libraries, load config, and run backup
+    source ./lib/variables.sh
+    source ./lib/core.sh
+    source ./lib/config.sh
+    source ./lib/database.sh
+    source ./lib/backup.sh
+    load_config
+    create_backup --non-interactive
+    exit 0
+fi
 
 # Run the main menu function when the script starts
 main_menu

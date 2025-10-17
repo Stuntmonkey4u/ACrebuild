@@ -70,7 +70,14 @@ create_backup_dry_run() {
 }
 
 create_backup() {
-    print_message $BLUE "--- Starting Backup Creation ---" true
+    local non_interactive=false
+    if [ "$1" == "--non-interactive" ]; then
+        non_interactive=true
+    fi
+
+    if [ "$non_interactive" = false ]; then
+        print_message $BLUE "--- Starting Backup Creation ---" true
+    fi
 
     local db_started_by_script=false
     local backup_result=0
@@ -88,6 +95,10 @@ create_backup() {
     (
         local current_db_user="$DB_USER"
         if [ -z "$current_db_user" ]; then
+            if [ "$non_interactive" = true ]; then
+                print_message $RED "DB_USER not set in config. Aborting non-interactive backup." true
+                return 1
+            fi
             print_message $YELLOW "Database username is not set. Enter the database username (e.g., acore):" true
             read -r db_user_input
             if [ -n "$db_user_input" ]; then
@@ -101,6 +112,10 @@ create_backup() {
 
         local effective_db_pass=""
         if [ -z "$DB_PASS" ]; then
+            if [ "$non_interactive" = true ]; then
+                print_message $RED "DB_PASS not set in config. Aborting non-interactive backup." true
+                return 1
+            fi
             print_message $YELLOW "Enter the database password for user '$DB_USER':" true
             read -s new_db_pass
             echo ""
@@ -115,7 +130,9 @@ create_backup() {
                 fi
             fi
         else
-            print_message $CYAN "Using saved database password for user '$DB_USER'." false
+            if [ "$non_interactive" = false ]; then
+                print_message $CYAN "Using saved database password for user '$DB_USER'." false
+            fi
             effective_db_pass="$DB_PASS"
         fi
 

@@ -48,8 +48,7 @@ ensure_db_is_running() {
             return 1
         fi
         sleep 1
-        echo -ne "
-${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
+        echo -ne "${CYAN}Waiting... (Status: ${health_status:-'unknown'}, Time: ${health_timer}s)${NC}  "
     done
     echo ""
 }
