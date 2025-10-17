@@ -43,7 +43,7 @@ create_backup_dry_run() {
     for DB_NAME in "${DATABASES[@]}"; do
         print_message $CYAN "[DRY RUN] Would back up database: $DB_NAME" false
         if is_docker_setup; then
-            print_message $WHITE "  Command: docker compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
+            print_message $WHITE "  Command: $DOCKER_EXEC_PATH compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
         else
             print_message $WHITE "  Command: mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
         fi
@@ -147,7 +147,7 @@ create_backup() {
             print_message $CYAN "Backing up database: $DB_NAME..." false
             local backup_failed=false
             if is_docker_setup; then
-                docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+                "$DOCKER_EXEC_PATH" compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
             else
                 MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
             fi
@@ -190,7 +190,7 @@ create_backup() {
     # Cleanup: Stop the database container if we started it
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the backup..." false
-        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 
@@ -279,7 +279,7 @@ restore_backup() {
             print_message $CYAN "Restoring database: $DB_NAME..." false
             local restore_failed=false
             if is_docker_setup; then
-                cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+                cat "$SQL_FILE" | "$DOCKER_EXEC_PATH" compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
             else
                 cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
             fi
@@ -309,7 +309,7 @@ restore_backup() {
 
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the restore..." false
-        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 

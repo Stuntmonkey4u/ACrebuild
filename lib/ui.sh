@@ -66,7 +66,7 @@ check_and_prompt_for_docker_usage() {
     # 1. A docker-compose.yml file exists in the AzerothCore directory.
     # 2. The 'docker' command is available on the system.
     # 3. The USE_DOCKER flag is currently false.
-    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ] && command -v docker &> /dev/null && [ "$USE_DOCKER" = false ]; then
+    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ] && [ -n "$DOCKER_EXEC_PATH" ] && [ "$USE_DOCKER" = false ]; then
         echo ""
         print_message $BLUE "------------------- Docker Setup Detected --------------------" true
         print_message $YELLOW "We've detected a 'docker-compose.yml' file and the 'docker' command." false

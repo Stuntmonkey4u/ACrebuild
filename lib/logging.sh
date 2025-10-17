@@ -60,7 +60,7 @@ view_auth_log() {
     print_message $CYAN "Accessing auth server log..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose logs ac-authserver
+        "$DOCKER_EXEC_PATH" compose logs ac-authserver
     else
         local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILENAME"
         view_log_file "$full_auth_log_path" "less"
@@ -71,7 +71,7 @@ view_auth_log_live() {
     print_message $CYAN "Accessing auth server log (live)..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose logs -f ac-authserver
+        "$DOCKER_EXEC_PATH" compose logs -f ac-authserver
     else
         local full_auth_log_path="$SERVER_LOG_DIR_PATH/$AUTH_SERVER_LOG_FILENAME"
         view_log_file "$full_auth_log_path" "tail_f"
@@ -82,7 +82,7 @@ view_world_log() {
     print_message $CYAN "Accessing world server log..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose logs ac-worldserver
+        "$DOCKER_EXEC_PATH" compose logs ac-worldserver
     else
         local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
         view_log_file "$full_world_log_path" "less"
@@ -93,7 +93,7 @@ view_world_log_live() {
     print_message $CYAN "Accessing world server log (live)..." false
     if is_docker_setup; then
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose logs -f ac-worldserver
+        "$DOCKER_EXEC_PATH" compose logs -f ac-worldserver
     else
         local full_world_log_path="$SERVER_LOG_DIR_PATH/$WORLD_SERVER_LOG_FILENAME"
         view_log_file "$full_world_log_path" "tail_f"

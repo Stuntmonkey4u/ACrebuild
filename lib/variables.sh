@@ -42,6 +42,7 @@ DEFAULT_USE_DOCKER=false
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
 AZEROTHCORE_DIR=""
+DOCKER_EXEC_PATH=""
 BUILD_DIR=""
 SCRIPT_DIR_PATH=""
 SCRIPT_IS_GIT_REPO=false

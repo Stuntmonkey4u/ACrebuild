@@ -78,7 +78,8 @@ setup_backup_schedule() {
     local cron_log_path="$SCRIPT_LOG_DIR/$DEFAULT_CRON_LOG_FILENAME"
     # This is the most robust way to construct a cron command with redirection.
     # It ensures the cd and the script run together, and all output goes to the log.
-    local command_to_run="{ cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup; } > '$cron_log_path' 2>&1"
+    # We also explicitly pass the docker path to the script.
+    local command_to_run="{ cd '$SCRIPT_DIR_PATH' && DOCKER_EXEC_PATH='$DOCKER_EXEC_PATH' '$script_path' --run-backup; } > '$cron_log_path' 2>&1"
 
     # Remove any existing backup job for this script
     (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
