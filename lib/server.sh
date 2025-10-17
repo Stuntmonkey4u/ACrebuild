@@ -251,10 +251,24 @@ stop_servers() {
 
 restart_servers() {
     if is_docker_setup; then
-        print_message $BLUE "--- Attempting to Restart Docker Containers ---" true
+        print_message $BLUE "--- Attempting to Restart/Start Docker Containers ---" true
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose restart
-        print_message $GREEN "Docker containers restarted." true
+
+        # Check if at least one of the main services is running
+        local auth_status
+        auth_status=$(docker inspect --format="{{.State.Status}}" ac-authserver 2>/dev/null)
+        local world_status
+        world_status=$(docker inspect --format="{{.State.Status}}" ac-worldserver 2>/dev/null)
+
+        if [ "$auth_status" = "running" ] || [ "$world_status" = "running" ]; then
+            print_message $CYAN "At least one server container is running. Issuing restart command..." false
+            docker compose restart
+            print_message $GREEN "Docker containers restart command issued." true
+        else
+            print_message $CYAN "No server containers are running. Issuing start command..." false
+            docker compose up -d
+            print_message $GREEN "Docker containers start command issued." true
+        fi
     else
         print_message $BLUE "--- Attempting to Restart AzerothCore Servers (TMUX) ---" true
         stop_servers
