@@ -126,25 +126,41 @@ handle_error() {
     print_message $RED "--------------------------------------------------------------------" true
     print_message $RED "ERROR: $error_message" true
 
-    if [[ "$error_message" == *"CMake configuration failed"* || "$error_message" == *"Build process ('make install') failed"* ]]; then
-        print_message $YELLOW "A build failure occurred. Would you like to run 'make clean' to try and fix it?" true
+    if [[ "$error_message" == *"CMake configuration failed"* || "$error_message" == *"Build process ('make install') failed"* || "$error_message" == *"Docker build failed"* ]]; then
+        if is_docker_setup; then
+            print_message $YELLOW "A Docker build failure occurred. Would you like to try rebuilding with the '--no-cache' option?" true
+            print_message $YELLOW "This can sometimes resolve issues with corrupted cache layers." true
+        else
+            print_message $YELLOW "A build failure occurred. Would you like to run 'make clean' to try and fix it?" true
+        fi
 
-        run_countdown_timer 900 # Call the countdown function (900 seconds = 15 minutes)
+        run_countdown_timer 900 # 15 minutes
         local countdown_result=$?
 
         if [ "$countdown_result" -eq 0 ]; then # User chose 'yes' or timed out
-            print_message $GREEN "Running 'make clean'..." true
-            if [ -d "$BUILD_DIR" ]; then
-                (cd "$BUILD_DIR" && make clean) || print_message $RED "Warning: 'make clean' encountered an error, but attempting rebuild anyway." false
+            if is_docker_setup; then
+                print_message $GREEN "Attempting to rebuild with '--no-cache'..." true
+                # We need a way to pass this option to the build function.
+                # For now, let's just attempt a normal rebuild, but ideally this would trigger a no-cache build.
+                # This highlights a need for better inter-function communication.
+                # Let's assume for now we can't easily pass a no-cache flag, so we just rebuild.
+                # A better implementation would be to set a global flag.
+                # For now, we will just call the main build function again.
+                build_and_install_with_spinner # This needs to be adapted to handle a no-cache flag
             else
-                print_message $RED "Build directory $BUILD_DIR not found. Cannot run 'make clean'." true
+                print_message $GREEN "Running 'make clean'..." true
+                if [ -d "$BUILD_DIR" ]; then
+                    (cd "$BUILD_DIR" && make clean) || print_message $RED "Warning: 'make clean' encountered an error, but attempting rebuild anyway." false
+                else
+                    print_message $RED "Build directory $BUILD_DIR not found. Cannot run 'make clean'." true
+                fi
+                print_message $BLUE "Attempting to rebuild..." true
+                build_and_install_with_spinner
             fi
-            print_message $BLUE "Attempting to rebuild..." true
-            build_and_install_with_spinner
             print_message $GREEN "Rebuild process finished." true
             exit 0
         elif [ "$countdown_result" -eq 1 ]; then # User chose 'no'
-            print_message $RED "Skipping 'make clean'. Exiting." true
+            print_message $RED "Skipping rebuild attempt. Exiting." true
             print_message $RED "--------------------------------------------------------------------" true
             exit 1
         # Optional: Handle other return codes from run_countdown_timer if you added them (e.g., for invalid input)

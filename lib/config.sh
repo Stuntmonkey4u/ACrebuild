@@ -26,7 +26,13 @@ load_config() {
     # --- Assign variables from config or use defaults if missing ---
     AZEROTHCORE_DIR="${AZEROTHCORE_DIR:-$DEFAULT_AZEROTHCORE_DIR}"
     BACKUP_DIR="${BACKUP_DIR:-$DEFAULT_BACKUP_DIR}"
-    DB_USER="${DB_USER:-$DEFAULT_DB_USER}"
+    # Set DB_USER default based on whether USE_DOCKER is true
+    USE_DOCKER="${USE_DOCKER:-$DEFAULT_USE_DOCKER}"
+    if [ "$USE_DOCKER" = true ]; then
+        DB_USER="${DB_USER:-$DEFAULT_DB_USER_DOCKER}"
+    else
+        DB_USER="${DB_USER:-$DEFAULT_DB_USER}"
+    fi
     # DB_PASS is intentionally not defaulted here if empty in config, to force prompt.
     # However, if the var is COMPLETELY ABSENT from config, DEFAULT_DB_PASS ("") should be used.
     # The `:-` operator handles if the var is unset or null. If it's set to empty string in config, it remains empty.
