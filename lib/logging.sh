@@ -46,15 +46,6 @@ view_log_file() {
     print_message $GREEN "Exited log view." true
 }
 
-view_script_log() {
-    print_message $CYAN "Accessing script log..." false
-    view_log_file "$SCRIPT_LOG_FILE" "less"
-}
-
-view_script_log_live() {
-    print_message $CYAN "Accessing script log (live)..." false
-    view_log_file "$SCRIPT_LOG_FILE" "tail_f"
-}
 
 view_auth_log() {
     print_message $CYAN "Accessing auth server log..." false

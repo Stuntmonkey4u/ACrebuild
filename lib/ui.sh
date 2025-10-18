@@ -338,44 +338,40 @@ show_log_viewer_menu() {
         print_message $YELLOW "Select a log to view:" true
         echo ""
         print_message $CYAN "  Standard View (less):" true
-        print_message $YELLOW "    [1] View Script Log (ACrebuild.log)" false
-        print_message $YELLOW "    [2] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false
-        print_message $YELLOW "    [3] View World Server Log ($WORLD_SERVER_LOG_FILENAME)" false
-        print_message $YELLOW "    [4] View SQL Error Log ($ERROR_LOG_FILENAME)" false
+        print_message $YELLOW "    [1] View Auth Server Log ($AUTH_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "    [2] View World Server Log ($WORLD_SERVER_LOG_FILENAME)" false
+        print_message $YELLOW "    [3] View SQL Error Log ($ERROR_LOG_FILENAME)" false
         echo ""
         print_message $CYAN "  Live View (tail -f):" true
-        print_message $YELLOW "    [5] Live View Script Log" false
-        print_message $YELLOW "    [6] Live View Auth Server Log" false
-        print_message $YELLOW "    [7] Live View World Server Log" false
+        print_message $YELLOW "    [4] Live View Auth Server Log" false
+        print_message $YELLOW "    [5] Live View World Server Log" false
         echo ""
         print_message $CYAN "  Cron/Scheduled Task Logs:" true
-        print_message $YELLOW "    [8] View Automated Backup Log" false
+        print_message $YELLOW "    [6] View Automated Backup Log" false
         echo ""
-        print_message $YELLOW "  [9] Return to Main Menu" false
+        print_message $YELLOW "  [7] Return to Main Menu" false
         echo ""
         print_message $BLUE "---------------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-9]: ${NC}")" log_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-7]: ${NC}")" log_choice
         case "$log_choice" in
-            1) view_script_log ;;
-            2) view_auth_log ;;
-            3) view_world_log ;;
-            4) view_error_log ;;
-            5) view_script_log_live ;;
-            6) view_auth_log_live ;;
-            7) view_world_log_live ;;
-            8) view_cron_log ;;
-            9)
+            1) view_auth_log ;;
+            2) view_world_log ;;
+            3) view_error_log ;;
+            4) view_auth_log_live ;;
+            5) view_world_log_live ;;
+            6) view_cron_log ;;
+            7)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-9)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-7)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
-        if [[ "$log_choice" != "8" ]]; then
+        if [[ "$log_choice" != "7" ]]; then
             read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
         fi
     done

@@ -47,11 +47,6 @@ load_config() {
     WORLD_SERVER_LOG_FILENAME="${WORLD_SERVER_LOG_FILENAME:-$DEFAULT_WORLD_SERVER_LOG_FILENAME}"
     ERROR_LOG_FILENAME="${ERROR_LOG_FILENAME:-$DEFAULT_ERROR_LOG_FILENAME}"
 
-    # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF are read from config file
-    # Then we set the main SCRIPT_LOG_DIR and SCRIPT_LOG_FILE used by print_message
-    SCRIPT_LOG_DIR="${SCRIPT_LOG_DIR:-$DEFAULT_SCRIPT_LOG_DIR}" # This uses the SCRIPT_LOG_DIR var from config file
-    SCRIPT_LOG_FILENAME="${SCRIPT_LOG_FILENAME:-$DEFAULT_SCRIPT_LOG_FILENAME}" # Uses SCRIPT_LOG_FILENAME from config
-
     POST_SHUTDOWN_DELAY_SECONDS="${POST_SHUTDOWN_DELAY_SECONDS:-$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS}"
     CORES="${CORES_FOR_BUILD:-$DEFAULT_CORES_FOR_BUILD}" # CORES is the runtime var, CORES_FOR_BUILD is from config
     USE_DOCKER="${USE_DOCKER:-$DEFAULT_USE_DOCKER}"
@@ -68,14 +63,6 @@ load_config() {
     AUTH_SERVER_EXEC="$AZEROTHCORE_DIR/env/dist/bin/authserver"
     WORLD_SERVER_EXEC="$AZEROTHCORE_DIR/env/dist/bin/worldserver"
 
-    # Update final SCRIPT_LOG_FILE path
-    # This ensures print_message uses the configured path from now on.
-    SCRIPT_LOG_FILE="$SCRIPT_LOG_DIR/$SCRIPT_LOG_FILENAME"
-
-    # Ensure the (potentially new) SCRIPT_LOG_DIR for print_message exists
-    if [ ! -d "$SCRIPT_LOG_DIR" ]; then
-        mkdir -p "$SCRIPT_LOG_DIR" || echo "WARNING: Could not create configured script log directory $SCRIPT_LOG_DIR."
-    fi
 
     # --- Configuration Migration/Update ---
     # If CRON_PATH is missing from an existing config, add it.
@@ -120,8 +107,6 @@ SERVER_LOG_DIR_PATH_SUFFIX="$DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX"
 AUTH_SERVER_LOG_FILENAME="$AUTH_SERVER_LOG_FILENAME"
 WORLD_SERVER_LOG_FILENAME="$WORLD_SERVER_LOG_FILENAME"
 ERROR_LOG_FILENAME="$ERROR_LOG_FILENAME"
-SCRIPT_LOG_DIR="$SCRIPT_LOG_DIR"
-SCRIPT_LOG_FILENAME="$SCRIPT_LOG_FILENAME"
 POST_SHUTDOWN_DELAY_SECONDS="$POST_SHUTDOWN_DELAY_SECONDS"
 CORES_FOR_BUILD="$CORES"
 USE_DOCKER="$USE_DOCKER"
