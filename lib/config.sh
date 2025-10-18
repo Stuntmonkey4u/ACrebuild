@@ -4,8 +4,9 @@
 load_config() {
     print_message $BLUE "Loading configuration..." true
 
-    # Create config directory if it doesn't exist
+    # Create config and log directories if they don't exist
     mkdir -p "$CONFIG_DIR" || { print_message $RED "FATAL: Could not create config directory $CONFIG_DIR. Exiting." true; exit 1; }
+    mkdir -p "$SCRIPT_LOG_DIR" || { print_message $RED "FATAL: Could not create log directory $SCRIPT_LOG_DIR. Exiting." true; exit 1; }
 
     if [ ! -f "$CONFIG_FILE" ]; then
         run_setup_wizard
