@@ -35,26 +35,25 @@ show_menu() {
     echo ""
     print_message $YELLOW "Select an option:" true
     echo ""
-    print_message $CYAN " Server Operations:" true
-    print_message $YELLOW "  [1] Rebuild and Run Server        (Shortcut: R)" false
-    print_message $YELLOW "  [2] Rebuild Server Only           (Shortcut: U)" false
-    print_message $YELLOW "  [3] Install New Module            (Shortcut: I)" false
-    print_message $YELLOW "  [4] Update Server Modules         (Shortcut: M)" false
+    print_message $CYAN " Core Actions:" true
+    print_message $YELLOW "  [1] Rebuild and Run Server" false
+    print_message $YELLOW "  [2] Rebuild Server Only" false
     echo ""
-    print_message $CYAN " Server Management & Configuration:" true
-    print_message $YELLOW "  [5] Process Management            (Shortcut: P)" false
-    print_message $YELLOW "  [6] Backup/Restore Options        (Shortcut: B)" false
-    print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
-    print_message $YELLOW "  [8] Database Console              (Shortcut: D)" false
-    echo ""
-    print_message $CYAN " Script Maintenance:" true
-    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
+    print_message $CYAN " Management & Tools:" true
+    print_message $YELLOW "  [3] Module Management" false
+    print_message $YELLOW "  [4] Server Management" false
+    print_message $YELLOW "  [5] Backup & Restore" false
+    print_message $YELLOW "  [6] Configuration" false
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        print_message $YELLOW "  [10] Self-Update ACrebuild Script (Shortcut: A)" false
+        print_message $YELLOW "  [7] Self-Update ACrebuild Script" false
     fi
     echo ""
     print_message $CYAN " Exit:" true
-    print_message $YELLOW "  [11] Quit Script                  (Shortcut: Q)" false
+    local quit_option=7
+    if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
+        quit_option=8
+    fi
+    print_message $YELLOW "  [$quit_option] Quit Script" false
     echo ""
     print_message $BLUE "-----------------------------------------------" true
 }
@@ -382,6 +381,85 @@ show_log_viewer_menu() {
     done
 }
 
+# Function to display module management menu
+show_module_management_menu() {
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "============= MODULE MANAGEMENT MENU =============" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Install New Module" false
+        print_message $YELLOW "  [2] Update Server Modules" false
+        print_message $YELLOW "  [3] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-3]: ${NC}")" module_choice
+        case "$module_choice" in
+            1)
+                install_module
+                ;;
+            2)
+                MODULE_DIR="${AZEROTHCORE_DIR}/modules"
+                update_modules "$MODULE_DIR"
+                ;;
+            3)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-3)." false
+                ;;
+        esac
+        # Adding a small pause before showing the menu again for better UX
+        if [[ "$module_choice" != "3" ]]; then
+            read -n 1 -s -r -p "Press any key to return to Module Management menu..."
+        fi
+    done
+}
+
+# Function to display server management menu
+show_server_management_menu() {
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "============ SERVER MANAGEMENT MENU ============" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Process Management" false
+        print_message $YELLOW "  [2] Log Viewer" false
+        print_message $YELLOW "  [3] Database Console" false
+        print_message $YELLOW "  [4] Return to Main Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" server_mgmt_choice
+        case "$server_mgmt_choice" in
+            1)
+                show_process_management_menu
+                ;;
+            2)
+                show_log_viewer_menu
+                ;;
+            3)
+                database_console
+                ;;
+            4)
+                print_message $GREEN "Returning to Main Menu..." false
+                break
+                ;;
+            *)
+                print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+                ;;
+        esac
+    done
+}
+
 # Function to display process management menu
 show_process_management_menu() {
     while true; do
@@ -434,74 +512,72 @@ show_process_management_menu() {
 # For actions that don't lead to a build/run cycle (e.g., showing a sub-menu),
 # it resets BUILD_ONLY and RUN_SERVER flags and returns to the main menu loop.
 handle_menu_choice() {
+    local max_option
+    if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
+        max_option=8
+    else
+        max_option=7
+    fi
+
     echo ""
-    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [R, U, I, M, P, B, L, D, C, A, Q, or 1-11]: ${NC}")" choice
+    read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-$max_option]: ${NC}")" choice
     case "$choice" in
-        1|[Rr]) # Rebuild and Run Server
+        1) # Rebuild and Run Server
             RUN_SERVER=true
             BUILD_ONLY=true
             ;;
-        2|[Uu]) # Rebuild Server Only
+        2) # Rebuild Server Only
             RUN_SERVER=false
             BUILD_ONLY=true
             ;;
-        3|[Ii]) # Install New Module
-            install_module
+        3) # Module Management
+            show_module_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        4|[Mm]) # Update Server Modules
-            MODULE_DIR="${AZEROTHCORE_DIR}/modules"
-            update_modules "$MODULE_DIR"
+        4) # Server Management
+            show_server_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        5|[Pp]) # Process Management
-            show_process_management_menu
-            RUN_SERVER=false
-            BUILD_ONLY=false
-            return
-            ;;
-        6|[Bb]) # Backup/Restore Options
+        5) # Backup/Restore Options
             show_backup_restore_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        7|[Ll]) # Log Viewer
-            show_log_viewer_menu
-            RUN_SERVER=false
-            BUILD_ONLY=false
-            return
-            ;;
-        8|[Dd]) # Database Console
-            database_console
-            RUN_SERVER=false
-            BUILD_ONLY=false
-            return
-            ;;
-        9|[Cc]) # Configuration Options
+        6) # Configuration Options
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        10|[Aa]) # Self-Update ACrebuild Script
+        7) # Self-Update ACrebuild Script or Quit
             if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
                 self_update_script
             else
-                print_message $RED "Cannot self-update: This script is not in a recognized Git repository." true
+                # This is the "Quit" option when not in a git repo
+                echo ""
+                print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
+                exit 0
             fi
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        11|[Qq]) # Quit Script
-            echo ""
-            print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
-            exit 0
+        8) # Quit Script
+            if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
+                # This is the "Quit" option when self-update is available
+                echo ""
+                print_message $GREEN "Exiting. Thank you for using the AzerothCore Rebuild Tool!" true
+                exit 0
+            else
+                # This case is hit if user enters 8 but self-update is not an option
+                print_message $RED "Invalid choice. Please select a valid option from the menu." false
+            fi
+            return
             ;;
         *)
             echo ""
