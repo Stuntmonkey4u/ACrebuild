@@ -2,7 +2,7 @@
 
 # Function to run the first-time setup wizard
 run_setup_wizard() {
-    clear
+    welcome_message
     print_message $BLUE "--- Welcome to the ACrebuild Setup Wizard ---" true
     print_message $CYAN "It looks like this is your first time running the script." false
     print_message $CYAN "Let's configure some basic settings." false
