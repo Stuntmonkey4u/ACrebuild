@@ -31,8 +31,6 @@ DEFAULT_SERVER_LOG_DIR_PATH_SUFFIX="env/dist/logs"
 DEFAULT_AUTH_SERVER_LOG_FILENAME="Auth.log"
 DEFAULT_WORLD_SERVER_LOG_FILENAME="Server.log"
 DEFAULT_ERROR_LOG_FILENAME="Errors.log"
-DEFAULT_SCRIPT_LOG_DIR="${HOME}/.ACrebuild/logs"
-DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
 DEFAULT_CRON_LOG_FILENAME="cron_backup.log"
 DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_AUTH_PORT=3724
@@ -60,9 +58,6 @@ SERVER_LOG_DIR_PATH=""
 AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
 WORLD_SERVER_LOG_FILENAME="" # Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
 ERROR_LOG_FILENAME=""
-# SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
-# SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
-SCRIPT_LOG_FILE="" # Actual path to script log file, derived by load_config from SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME
 POST_SHUTDOWN_DELAY_SECONDS=""
 AUTH_PORT=""
 WORLD_PORT=""

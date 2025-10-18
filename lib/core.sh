@@ -11,32 +11,10 @@ BOLD='\033[1m'           # Bold for emphasis
 NC='\033[0m'             # No Color (reset)
 
 # Function to print the message with a specific color and optional bold text
-# Note: SCRIPT_LOG_DIR and SCRIPT_LOG_FILE are used here.
-# These will use the global DEFAULT values until load_config() is called.
-# load_config() will then update them based on config values.
 print_message() {
     local color=$1
     local message=$2
     local bold=$3
-    local log_message # For storing the uncolored message
-
-    # Determine which log directory/file to use (pre-config vs post-config)
-    local current_log_dir="${SCRIPT_LOG_DIR:-$DEFAULT_SCRIPT_LOG_DIR}"
-    local current_log_file="${SCRIPT_LOG_FILE:-$current_log_dir/$DEFAULT_SCRIPT_LOG_FILENAME}"
-
-    # Create SCRIPT_LOG_DIR if it doesn't exist
-    if [ ! -d "$current_log_dir" ]; then
-        mkdir -p "$current_log_dir" || echo "WARNING: Could not create script log directory $current_log_dir. Logging to file will be disabled for this message."
-    fi
-
-    # Prepare message for logging (remove color codes)
-    # Using echo -e to interpret escape sequences, then sed to remove them.
-    log_message=$(echo -e "$message" | sed 's/\x1b\[[0-9;]*m//g')
-
-    # Append timestamped message to SCRIPT_LOG_FILE
-    if [ -d "$current_log_dir" ]; then # Check again in case creation failed
-        echo "$(date '+%Y-%m-%d %H:%M:%S') - $log_message" >> "$current_log_file"
-    fi
 
     # Print to console with color
     if [ "$bold" = true ]; then
