@@ -19,6 +19,9 @@ source ./lib/cron.sh
 main_menu() {
     clear
 
+    # Display welcome message
+    welcome_message
+
     # Load configuration first
     load_config
 

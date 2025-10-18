@@ -16,7 +16,6 @@ WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes f
 # Configuration File Variables
 CONFIG_DIR="${HOME}/.ACrebuild"
 CONFIG_FILE="${CONFIG_DIR}/ACrebuild.conf"
-SCRIPT_LOG_DIR="${CONFIG_DIR}/logs"
 
 # Default values for configuration
 DEFAULT_AZEROTHCORE_DIR="/root/azerothcore-wotlk"

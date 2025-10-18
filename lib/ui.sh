@@ -42,17 +42,16 @@ show_menu() {
     print_message $CYAN " Management & Tools:" true
     print_message $YELLOW "  [3] Module Management" false
     print_message $YELLOW "  [4] Server Management" false
-    print_message $YELLOW "  [5] Log Viewer" false
-    print_message $YELLOW "  [6] Backup & Restore" false
-    print_message $YELLOW "  [7] Configuration" false
+    print_message $YELLOW "  [5] Backup & Restore" false
+    print_message $YELLOW "  [6] Configuration" false
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        print_message $YELLOW "  [8] Self-Update ACrebuild Script" false
+        print_message $YELLOW "  [7] Self-Update ACrebuild Script" false
     fi
     echo ""
     print_message $CYAN " Exit:" true
-    local quit_option=8
+    local quit_option=7
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        quit_option=9
+        quit_option=8
     fi
     print_message $YELLOW "  [$quit_option] Quit Script" false
     echo ""
@@ -177,33 +176,26 @@ show_config_management_menu() {
                 ;;
             3)
                 local new_docker_mode
-                local confirm_toggle
-                print_message $YELLOW "Are you sure you want to toggle Docker Mode? (y/n)" true
-                read -r confirm_toggle
-                if [[ "$confirm_toggle" =~ ^[Yy]$ ]]; then
-                    if [ "$USE_DOCKER" = true ]; then
-                        new_docker_mode=false
-                        print_message $GREEN "Disabling Docker Mode." false
-                        # If current DB user is the Docker default, switch it to the standard default
-                        if [ "$DB_USER" == "$DEFAULT_DB_USER_DOCKER" ]; then
-                            print_message $CYAN "Switching DB_USER to standard default '$DEFAULT_DB_USER'." false
-                            save_config_value "DB_USER" "$DEFAULT_DB_USER"
-                        fi
-                    else
-                        new_docker_mode=true
-                        print_message $GREEN "Enabling Docker Mode." false
-                        # If current DB user is the standard default, switch it to the Docker default
-                        if [ "$DB_USER" == "$DEFAULT_DB_USER" ]; then
-                            print_message $CYAN "Switching DB_USER to Docker default '$DEFAULT_DB_USER_DOCKER'." false
-                            save_config_value "DB_USER" "$DEFAULT_DB_USER_DOCKER"
-                        fi
+                if [ "$USE_DOCKER" = true ]; then
+                    new_docker_mode=false
+                    print_message $GREEN "Disabling Docker Mode." false
+                    # If current DB user is the Docker default, switch it to the standard default
+                    if [ "$DB_USER" == "$DEFAULT_DB_USER_DOCKER" ]; then
+                        print_message $CYAN "Switching DB_USER to standard default '$DEFAULT_DB_USER'." false
+                        save_config_value "DB_USER" "$DEFAULT_DB_USER"
                     fi
-                    save_config_value "USE_DOCKER" "$new_docker_mode"
-                    # Reload config to make the change active immediately
-                    load_config
                 else
-                    print_message $GREEN "Docker Mode toggle cancelled." false
+                    new_docker_mode=true
+                    print_message $GREEN "Enabling Docker Mode." false
+                    # If current DB user is the standard default, switch it to the Docker default
+                    if [ "$DB_USER" == "$DEFAULT_DB_USER" ]; then
+                        print_message $CYAN "Switching DB_USER to Docker default '$DEFAULT_DB_USER_DOCKER'." false
+                        save_config_value "DB_USER" "$DEFAULT_DB_USER_DOCKER"
+                    fi
                 fi
+                save_config_value "USE_DOCKER" "$new_docker_mode"
+                # Reload config to make the change active immediately
+                load_config
                 ;;
             4)
                 validate_settings
@@ -435,26 +427,30 @@ show_server_management_menu() {
         print_message $YELLOW "Select an option:" true
         echo ""
         print_message $YELLOW "  [1] Process Management" false
-        print_message $YELLOW "  [2] Database Console" false
-        print_message $YELLOW "  [3] Return to Main Menu" false
+        print_message $YELLOW "  [2] Log Viewer" false
+        print_message $YELLOW "  [3] Database Console" false
+        print_message $YELLOW "  [4] Return to Main Menu" false
         echo ""
         print_message $BLUE "-----------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-3]: ${NC}")" server_mgmt_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" server_mgmt_choice
         case "$server_mgmt_choice" in
             1)
                 show_process_management_menu
                 ;;
             2)
-                database_console
+                show_log_viewer_menu
                 ;;
             3)
+                database_console
+                ;;
+            4)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-3)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-4)." false
                 ;;
         esac
     done
@@ -514,9 +510,9 @@ show_process_management_menu() {
 handle_menu_choice() {
     local max_option
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
-        max_option=9
-    else
         max_option=8
+    else
+        max_option=7
     fi
 
     echo ""
@@ -542,25 +538,19 @@ handle_menu_choice() {
             BUILD_ONLY=false
             return
             ;;
-        5) # Log Viewer
-            show_log_viewer_menu
-            RUN_SERVER=false
-            BUILD_ONLY=false
-            return
-            ;;
-        6) # Backup/Restore Options
+        5) # Backup/Restore Options
             show_backup_restore_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        7) # Configuration Options
+        6) # Configuration Options
             show_config_management_menu
             RUN_SERVER=false
             BUILD_ONLY=false
             return
             ;;
-        8) # Self-Update ACrebuild Script or Quit
+        7) # Self-Update ACrebuild Script or Quit
             if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
                 self_update_script
             else
@@ -573,7 +563,7 @@ handle_menu_choice() {
             BUILD_ONLY=false
             return
             ;;
-        9) # Quit Script
+        8) # Quit Script
             if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
                 # This is the "Quit" option when self-update is available
                 echo ""
