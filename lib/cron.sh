@@ -26,11 +26,26 @@ check_cron_service() {
 setup_backup_schedule() {
     print_message $BLUE "--- Setup Automated Backup Schedule ---" true
 
-    # Check for saved password
+    # Check for saved password and prompt if not set
     if [ -z "$DB_PASS" ]; then
-        print_message $RED "Error: A database password must be saved in the configuration to set up automated backups." true
-        print_message $YELLOW "Please go to the Backup/Restore menu, run a manual backup, and choose to save the password." true
-        return 1
+        print_message $YELLOW "A database password must be saved in the configuration for automated backups." true
+        print_message $RED "${BOLD}Security Warning: Saving your password to the config file is not recommended.${NC}" true
+        print_message $YELLOW "Do you want to enter and save the password now? (y/n)" true
+        read -r save_pass_choice
+        if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
+            print_message $YELLOW "Enter the database password for user '$DB_USER':" true
+            read -s new_db_pass
+            echo ""
+            if [ -z "$new_db_pass" ]; then
+                print_message $RED "Password cannot be empty. Aborting." true
+                return 1
+            fi
+            save_config_value "DB_PASS" "$new_db_pass"
+            DB_PASS="$new_db_pass" # Set for current session
+        else
+            print_message $GREEN "Operation cancelled. No backup schedule was created." true
+            return 1
+        fi
     fi
 
     # Scheduling wizard
