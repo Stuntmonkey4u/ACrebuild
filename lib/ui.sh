@@ -7,7 +7,7 @@
 welcome_message() {
     clear
     print_message $BLUE "----------------------------------------------" true
-    print_message $BLUE "Welcome to AzerothCore Rebuild!           " true
+    print_message $BLUE "Welcome to ACebuild!           " true
     print_message $BLUE "----------------------------------------------" true
     echo ""
     print_message $BLUE "This script provides an interactive way to manage your AzerothCore server, including:" true
