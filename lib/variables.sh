@@ -16,12 +16,11 @@ WORLDSERVER_CONSOLE_COMMAND_STOP="server shutdown 1" # 300 seconds = 5 minutes f
 # Configuration File Variables
 CONFIG_DIR="${HOME}/.ACrebuild"
 CONFIG_FILE="${CONFIG_DIR}/ACrebuild.conf"
+SCRIPT_LOG_DIR="${CONFIG_DIR}/logs"
 
 # Default values for configuration
 DEFAULT_AZEROTHCORE_DIR="/root/azerothcore-wotlk"
 DEFAULT_BACKUP_DIR="${HOME}/ac_backups"
-DEFAULT_SCRIPT_LOG_DIR="${HOME}/.ACrebuild/logs"
-DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
 DEFAULT_DB_USER="acore"
 DEFAULT_DB_USER_DOCKER="root" # Docker-specific default user
 DEFAULT_DB_PASS=""
