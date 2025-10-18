@@ -15,6 +15,10 @@ check_dependencies() {
             for DEP in "${DEPENDENCIES[@]}"; do
                 if ! command -v "$DEP" &>/dev/null; then
                     MISSING_DEPENDENCIES+=("$DEP")
+                else
+                    if [ "$DEP" == "docker" ]; then
+                        DOCKER_EXEC_PATH=$(command -v docker)
+                    fi
                 fi
             done
         else

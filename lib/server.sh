@@ -8,7 +8,7 @@ start_servers() {
     if is_docker_setup; then
         print_message $BLUE "--- Attempting to Start Docker Containers ---" true
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose up -d
+        "$DOCKER_EXEC_PATH" compose up -d
         print_message $GREEN "Docker containers started. Use 'Check Server Status' to see their state." true
     else
         print_message $BLUE "--- Attempting to Start AzerothCore Servers (TMUX) ---" true
@@ -148,7 +148,7 @@ stop_servers() {
     if is_docker_setup; then
         print_message $BLUE "--- Attempting to Stop Docker Containers ---" true
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose down
+        "$DOCKER_EXEC_PATH" compose down
         print_message $GREEN "Docker containers stopped." true
     else
         print_message $BLUE "--- Attempting to Stop AzerothCore Servers (TMUX) ---" true
@@ -256,17 +256,17 @@ restart_servers() {
 
         # Check if at least one of the main services is running
         local auth_status
-        auth_status=$(docker inspect --format="{{.State.Status}}" ac-authserver 2>/dev/null)
+        auth_status=$("$DOCKER_EXEC_PATH" inspect --format="{{.State.Status}}" ac-authserver 2>/dev/null)
         local world_status
-        world_status=$(docker inspect --format="{{.State.Status}}" ac-worldserver 2>/dev/null)
+        world_status=$("$DOCKER_EXEC_PATH" inspect --format="{{.State.Status}}" ac-worldserver 2>/dev/null)
 
         if [ "$auth_status" = "running" ] || [ "$world_status" = "running" ]; then
             print_message $CYAN "At least one server container is running. Issuing restart command..." false
-            docker compose restart
+            "$DOCKER_EXEC_PATH" compose restart
             print_message $GREEN "Docker containers restart command issued." true
         else
             print_message $CYAN "No server containers are running. Issuing start command..." false
-            docker compose up -d
+            "$DOCKER_EXEC_PATH" compose up -d
             print_message $GREEN "Docker containers start command issued." true
         fi
     else
@@ -299,7 +299,7 @@ check_server_status() {
     if is_docker_setup; then
         print_message $BLUE "--- Checking Docker Container Status ---" true
         cd "$AZEROTHCORE_DIR" || return 1
-        docker compose ps
+        "$DOCKER_EXEC_PATH" compose ps
     else
         print_message $BLUE "--- Checking AzerothCore Server Status (TMUX) ---" true
 
@@ -577,7 +577,7 @@ build_and_install_with_spinner() {
     if is_docker_setup; then
         print_message $CYAN "Running Docker build..." true
         cd "$AZEROTHCORE_DIR" || handle_error "Failed to change directory to $AZEROTHCORE_DIR"
-        docker compose build || handle_error "Docker build failed. Check the output above for details."
+        "$DOCKER_EXEC_PATH" compose build || handle_error "Docker build failed. Check the output above for details."
         print_message $GREEN "--- Docker Build Process Completed Successfully ---" true
     else
         # Ensure BUILD_DIR is correctly updated

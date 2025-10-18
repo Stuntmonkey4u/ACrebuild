@@ -43,7 +43,7 @@ create_backup_dry_run() {
     for DB_NAME in "${DATABASES[@]}"; do
         print_message $CYAN "[DRY RUN] Would back up database: $DB_NAME" false
         if is_docker_setup; then
-            print_message $WHITE "  Command: docker compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
+            print_message $WHITE "  Command: $DOCKER_EXEC_PATH compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
         else
             print_message $WHITE "  Command: mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
         fi
@@ -70,12 +70,23 @@ create_backup_dry_run() {
 }
 
 create_backup() {
-    print_message $BLUE "--- Starting Backup Creation ---" true
+    local non_interactive=false
+    if [ "${1-}" == "--non-interactive" ]; then
+        non_interactive=true
+    fi
+
+    if [ "$non_interactive" = false ]; then
+        print_message $BLUE "--- Starting Backup Creation ---" true
+    fi
 
     local db_started_by_script=false
     local backup_result=0
 
-    ensure_db_is_running
+    if [ "$non_interactive" = true ]; then
+        ensure_db_is_running --non-interactive
+    else
+        ensure_db_is_running
+    fi
     local db_check_result=$?
 
     if [ $db_check_result -eq 1 ]; then # Error or user abort
@@ -88,6 +99,10 @@ create_backup() {
     (
         local current_db_user="$DB_USER"
         if [ -z "$current_db_user" ]; then
+            if [ "$non_interactive" = true ]; then
+                print_message $RED "DB_USER not set in config. Aborting non-interactive backup." true
+                return 1
+            fi
             print_message $YELLOW "Database username is not set. Enter the database username (e.g., acore):" true
             read -r db_user_input
             if [ -n "$db_user_input" ]; then
@@ -101,6 +116,10 @@ create_backup() {
 
         local effective_db_pass=""
         if [ -z "$DB_PASS" ]; then
+            if [ "$non_interactive" = true ]; then
+                print_message $RED "DB_PASS not set in config. Aborting non-interactive backup." true
+                return 1
+            fi
             print_message $YELLOW "Enter the database password for user '$DB_USER':" true
             read -s new_db_pass
             echo ""
@@ -109,13 +128,15 @@ create_backup() {
             if [ -n "$effective_db_pass" ]; then
                 print_message $YELLOW "Save this database password to configuration? (Not Recommended)" true
                 read -r save_pass_choice
-                if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
+                if [[ "$save_pass_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
                     save_config_value "DB_PASS" "$effective_db_pass"
                     DB_PASS="$effective_db_pass"
                 fi
             fi
         else
-            print_message $CYAN "Using saved database password for user '$DB_USER'." false
+            if [ "$non_interactive" = false ]; then
+                print_message $CYAN "Using saved database password for user '$DB_USER'." false
+            fi
             effective_db_pass="$DB_PASS"
         fi
 
@@ -130,7 +151,7 @@ create_backup() {
             print_message $CYAN "Backing up database: $DB_NAME..." false
             local backup_failed=false
             if is_docker_setup; then
-                docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+                "$DOCKER_EXEC_PATH" compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
             else
                 MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
             fi
@@ -173,7 +194,7 @@ create_backup() {
     # Cleanup: Stop the database container if we started it
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the backup..." false
-        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 
@@ -262,7 +283,7 @@ restore_backup() {
             print_message $CYAN "Restoring database: $DB_NAME..." false
             local restore_failed=false
             if is_docker_setup; then
-                cat "$SQL_FILE" | docker compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+                cat "$SQL_FILE" | "$DOCKER_EXEC_PATH" compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
             else
                 cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
             fi
@@ -292,7 +313,7 @@ restore_backup() {
 
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the restore..." false
-        docker compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 

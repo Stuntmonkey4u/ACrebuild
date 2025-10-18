@@ -26,49 +26,59 @@ run_setup_wizard() {
             fi
         fi
     done
-    save_config_value "AZEROTHCORE_DIR" "$ac_dir"
+    AZEROTHCORE_DIR="$ac_dir" # Set runtime variable
     echo ""
 
     # 2. Ask about Docker Mode
-    local use_docker
-    if [ -f "$ac_dir/docker-compose.yml" ]; then
+    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ]; then
         print_message $YELLOW "We detected a 'docker-compose.yml' file." true
         print_message $YELLOW "Do you want to run in Docker Mode? (y/n)" true
-        read -p "Enter choice: " docker_choice
-        if [[ "$docker_choice" =~ ^[Yy]$ ]]; then
-            use_docker=true
+        read -p "Enter choice [y]: " docker_choice
+        if [[ "$docker_choice" =~ ^[Yy]?$ ]]; then # Default to yes
+            USE_DOCKER=true
         else
-            use_docker=false
+            USE_DOCKER=false
         fi
     else
-         use_docker=false
+         USE_DOCKER=false
     fi
-    save_config_value "USE_DOCKER" "$use_docker"
     echo ""
 
     # 3. Ask for Database User
-    local db_user
-    if [ "$use_docker" = true ]; then
+    if [ "$USE_DOCKER" = true ]; then
         print_message $YELLOW "What is the database user for your Docker setup?" true
         print_message $CYAN "Default: $DEFAULT_DB_USER_DOCKER" false
-        read -p "Enter user or press ENTER for default: " db_user
-        db_user=${db_user:-$DEFAULT_DB_USER_DOCKER}
+        read -p "Enter user or press ENTER for default: " db_user_input
+        DB_USER=${db_user_input:-$DEFAULT_DB_USER_DOCKER}
     else
         print_message $YELLOW "What is your local database user?" true
         print_message $CYAN "Default: $DEFAULT_DB_USER" false
-        read -p "Enter user or press ENTER for default: " db_user
-        db_user=${db_user:-$DEFAULT_DB_USER}
+        read -p "Enter user or press ENTER for default: " db_user_input
+        DB_USER=${db_user_input:-$DEFAULT_DB_USER}
     fi
-    save_config_value "DB_USER" "$db_user"
     echo ""
 
     # 4. Ask for Backup Directory
-    local backup_dir
     print_message $YELLOW "Where should backups be stored?" true
     print_message $CYAN "Default: $DEFAULT_BACKUP_DIR" false
-    read -p "Enter path or press ENTER for default: " backup_dir
-    backup_dir=${backup_dir:-$DEFAULT_BACKUP_DIR}
-    save_config_value "BACKUP_DIR" "$backup_dir"
+    read -p "Enter path or press ENTER for default: " backup_dir_input
+    BACKUP_DIR=${backup_dir_input:-$DEFAULT_BACKUP_DIR}
+
+    # 5. Set remaining variables to defaults before saving
+    DB_PASS="$DEFAULT_DB_PASS"
+    AUTH_DB_NAME="$DEFAULT_AUTH_DB_NAME"
+    CHAR_DB_NAME="$DEFAULT_CHAR_DB_NAME"
+    WORLD_DB_NAME="$DEFAULT_WORLD_DB_NAME"
+    SCRIPT_LOG_DIR="$DEFAULT_SCRIPT_LOG_DIR"
+    SCRIPT_LOG_FILENAME="$DEFAULT_SCRIPT_LOG_FILENAME"
+    AUTH_SERVER_LOG_FILENAME="$DEFAULT_AUTH_SERVER_LOG_FILENAME"
+    WORLD_SERVER_LOG_FILENAME="$DEFAULT_WORLD_SERVER_LOG_FILENAME"
+    ERROR_LOG_FILENAME="$DEFAULT_ERROR_LOG_FILENAME"
+    POST_SHUTDOWN_DELAY_SECONDS="$DEFAULT_POST_SHUTDOWN_DELAY_SECONDS"
+    CORES="$DEFAULT_CORES_FOR_BUILD"
+
+    # 6. Save all collected settings
+    save_config
 
     echo ""
     print_message $GREEN "--- Initial Setup Complete! ---" true

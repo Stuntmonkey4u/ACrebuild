@@ -46,12 +46,13 @@ show_menu() {
     print_message $YELLOW "  [6] Backup/Restore Options        (Shortcut: B)" false
     print_message $YELLOW "  [7] Log Viewer                    (Shortcut: L)" false
     print_message $YELLOW "  [8] Database Console              (Shortcut: D)" false
-    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
     echo ""
     print_message $CYAN " Script Maintenance:" true
+    print_message $YELLOW "  [9] Configuration Options         (Shortcut: C)" false
     if [ "$SCRIPT_IS_GIT_REPO" = true ]; then
         print_message $YELLOW "  [10] Self-Update ACrebuild Script (Shortcut: A)" false
     fi
+    echo ""
     print_message $CYAN " Exit:" true
     print_message $YELLOW "  [11] Quit Script                  (Shortcut: Q)" false
     echo ""
@@ -65,7 +66,7 @@ check_and_prompt_for_docker_usage() {
     # 1. A docker-compose.yml file exists in the AzerothCore directory.
     # 2. The 'docker' command is available on the system.
     # 3. The USE_DOCKER flag is currently false.
-    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ] && command -v docker &> /dev/null && [ "$USE_DOCKER" = false ]; then
+    if [ -f "$AZEROTHCORE_DIR/docker-compose.yml" ] && [ -n "$DOCKER_EXEC_PATH" ] && [ "$USE_DOCKER" = false ]; then
         echo ""
         print_message $BLUE "------------------- Docker Setup Detected --------------------" true
         print_message $YELLOW "We've detected a 'docker-compose.yml' file and the 'docker' command." false
@@ -248,12 +249,13 @@ show_backup_restore_menu() {
         print_message $YELLOW "  [1] Create Backup" false
         print_message $YELLOW "  [2] Create Backup (Dry Run)" false
         print_message $YELLOW "  [3] Restore from Backup" false
-        print_message $YELLOW "  [4] Return to Main Menu" false
+        print_message $YELLOW "  [4] Manage Automated Backups" false
+        print_message $YELLOW "  [5] Return to Main Menu" false
         echo ""
         print_message $BLUE "-----------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-5]: ${NC}")" backup_choice
         case "$backup_choice" in
             1)
                 create_backup
@@ -265,17 +267,65 @@ show_backup_restore_menu() {
                 restore_backup
                 ;;
             4)
+                show_automated_backup_menu
+                ;;
+            5)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-4)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-5)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
         if [[ "$backup_choice" != "4" ]]; then
             read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
         fi
+    done
+}
+
+# Function to display the automated backup management menu
+show_automated_backup_menu() {
+    if ! command -v crontab &>/dev/null; then
+        print_message $RED "Error: 'crontab' command not found. This feature is not supported on your system." true
+        read -n 1 -s -r -p "Press any key to return..."
+        return 1
+    fi
+
+    check_cron_service
+    local cron_status=$?
+    if [ $cron_status -ne 0 ]; then
+        print_message $RED "Error: The cron service is not running on your system." true
+        print_message $YELLOW "Automated backups cannot be scheduled without the cron daemon." true
+        print_message $YELLOW "On most systems, you can enable it with: sudo systemctl enable --now cron" true
+        read -n 1 -s -r -p "Press any key to return..."
+        return 1
+    fi
+
+    while true; do
+        clear
+        echo ""
+        print_message $BLUE "========== AUTOMATED BACKUP MANAGEMENT ==========" true
+        echo ""
+        print_message $YELLOW "Select an option:" true
+        echo ""
+        print_message $YELLOW "  [1] Setup or Change Schedule" false
+        print_message $YELLOW "  [2] View Current Schedule" false
+        print_message $YELLOW "  [3] Disable Automated Backups" false
+        print_message $YELLOW "  [4] Return to Backup/Restore Menu" false
+        echo ""
+        print_message $BLUE "-----------------------------------------------" true
+
+        echo ""
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-4]: ${NC}")" backup_mgmt_choice
+        case "$backup_mgmt_choice" in
+            1) setup_backup_schedule ;;
+            2) view_backup_schedule ;;
+            3) disable_automated_backups ;;
+            4) break ;;
+            *) print_message $RED "Invalid choice. Please select a valid option." false ;;
+        esac
+        read -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
     done
 }
 
@@ -299,12 +349,15 @@ show_log_viewer_menu() {
         print_message $YELLOW "    [6] Live View Auth Server Log" false
         print_message $YELLOW "    [7] Live View World Server Log" false
         echo ""
-        print_message $YELLOW "  [8] Return to Main Menu" false
+        print_message $CYAN "  Cron/Scheduled Task Logs:" true
+        print_message $YELLOW "    [8] View Automated Backup Log" false
+        echo ""
+        print_message $YELLOW "  [9] Return to Main Menu" false
         echo ""
         print_message $BLUE "---------------------------------------------------" true
 
         echo ""
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-8]: ${NC}")" log_choice
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-9]: ${NC}")" log_choice
         case "$log_choice" in
             1) view_script_log ;;
             2) view_auth_log ;;
@@ -313,12 +366,13 @@ show_log_viewer_menu() {
             5) view_script_log_live ;;
             6) view_auth_log_live ;;
             7) view_world_log_live ;;
-            8)
+            8) view_cron_log ;;
+            9)
                 print_message $GREEN "Returning to Main Menu..." false
                 break
                 ;;
             *)
-                print_message $RED "Invalid choice. Please select a valid option (1-8)." false
+                print_message $RED "Invalid choice. Please select a valid option (1-9)." false
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX

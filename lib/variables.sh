@@ -33,14 +33,17 @@ DEFAULT_WORLD_SERVER_LOG_FILENAME="Server.log"
 DEFAULT_ERROR_LOG_FILENAME="Errors.log"
 DEFAULT_SCRIPT_LOG_DIR="${HOME}/.ACrebuild/logs"
 DEFAULT_SCRIPT_LOG_FILENAME="ACrebuild.log"
+DEFAULT_CRON_LOG_FILENAME="cron_backup.log"
 DEFAULT_POST_SHUTDOWN_DELAY_SECONDS=10
 DEFAULT_AUTH_PORT=3724
 DEFAULT_WORLD_PORT=8085
 DEFAULT_CORES_FOR_BUILD=""
 DEFAULT_USE_DOCKER=false
+DEFAULT_CRON_PATH=""
 
 # Runtime variables - These will be loaded from config or set to default by load_config()
 AZEROTHCORE_DIR=""
+DOCKER_EXEC_PATH=""
 BUILD_DIR=""
 SCRIPT_DIR_PATH=""
 SCRIPT_IS_GIT_REPO=false
@@ -55,7 +58,7 @@ WORLD_DB_NAME=""
 SERVER_CONFIG_DIR_PATH=""
 SERVER_LOG_DIR_PATH=""
 AUTH_SERVER_LOG_FILENAME="" # Renamed from AUTH_SERVER_LOG_FILE to avoid confusion with full path for clarity
-WORLD_SERVER_LOG_FILENAME=""# Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
+WORLD_SERVER_LOG_FILENAME="" # Renamed from WORLD_SERVER_LOG_FILE to avoid confusion with full path for clarity
 ERROR_LOG_FILENAME=""
 # SCRIPT_LOG_DIR_CONF and SCRIPT_LOG_FILENAME_CONF were part of an earlier idea and are no longer used.
 # SCRIPT_LOG_DIR and SCRIPT_LOG_FILENAME are loaded directly, and print_message handles pre-config state.
