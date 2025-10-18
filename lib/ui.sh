@@ -285,7 +285,8 @@ show_backup_restore_menu() {
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
-        if [[ "$backup_choice" != "4" ]]; then
+        # Only pause if we are not entering another submenu and not exiting
+        if [[ "$backup_choice" != "4" && "$backup_choice" != "5" ]]; then
             read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
         fi
     done
@@ -380,10 +381,7 @@ show_log_viewer_menu() {
                 print_message $RED "Invalid choice. Please select a valid option (1-7)." false
                 ;;
         esac
-        # Adding a small pause before showing the menu again for better UX
-        if [[ "$log_choice" != "7" ]]; then
-            read -n 1 -s -r -p "Press any key to return to the Log Viewer menu..."
-        fi
+        # No pause here, as log viewers handle their own exit.
     done
 }
 
@@ -421,6 +419,7 @@ show_module_management_menu() {
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
+        # Only pause if we are not exiting
         if [[ "$module_choice" != "3" ]]; then
             read -n 1 -s -r -p "Press any key to return to Module Management menu..."
         fi
@@ -503,6 +502,7 @@ show_process_management_menu() {
                 ;;
         esac
         # Adding a small pause before showing the menu again for better UX
+        # Only pause if we are not exiting
         if [[ "$proc_choice" != "5" ]]; then
             read -n 1 -s -r -p "Press any key to return to Process Management menu..."
         fi
