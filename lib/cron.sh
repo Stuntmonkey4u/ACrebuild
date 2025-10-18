@@ -64,7 +64,7 @@ setup_backup_schedule() {
     read -p "Hour (0-23): " hour
     read -p "Minute (0-59): " minute
 
-    # Basic validation
+    # Basic validation, forcing base-10 interpretation
     if ! [[ "$hour" =~ ^[0-9]+$ ]] || ! ((10#$hour >= 0 && 10#$hour <= 23)); then
         print_message $RED "Invalid hour format. Must be a number between 0 and 23. Aborting." true
         return 1
