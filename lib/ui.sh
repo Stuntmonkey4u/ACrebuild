@@ -332,7 +332,9 @@ show_automated_backup_menu() {
             4) break ;;
             *) print_message $RED "Invalid choice. Please select a valid option." false ;;
         esac
-        read -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
+        if [[ "$backup_mgmt_choice" != "4" ]]; then
+            read -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
+        fi
     done
 }
 
