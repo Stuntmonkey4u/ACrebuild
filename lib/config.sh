@@ -77,6 +77,19 @@ load_config() {
         mkdir -p "$SCRIPT_LOG_DIR" || echo "WARNING: Could not create configured script log directory $SCRIPT_LOG_DIR."
     fi
 
+    # --- Configuration Migration/Update ---
+    # If CRON_PATH is missing from an existing config, add it.
+    if [ -z "$CRON_PATH" ]; then
+        print_message $YELLOW "CRON_PATH not found in config, adding it now..." true
+        local current_system_path
+        current_system_path=$(echo "$PATH")
+        save_config_value "CRON_PATH" "$current_system_path"
+        # Reload the variable for the current session
+        CRON_PATH="$current_system_path"
+        print_message $GREEN "CRON_PATH has been saved to your configuration." true
+        print_message $YELLOW "To apply this to an existing cron job, please re-run the 'Setup Automated Backup Schedule' option from the Backup Menu." true
+    fi
+
     print_message $GREEN "Configuration loaded successfully." true
 }
 
