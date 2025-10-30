@@ -32,7 +32,7 @@ setup_backup_schedule() {
         print_message $RED "${BOLD}Security Warning: Saving your password to the config file is not recommended.${NC}" true
         print_message $YELLOW "Do you want to enter and save the password now? (y/n)" true
         read -r save_pass_choice
-        if [[ "$save_pass_choice" =~ ^[Yy]$ ]]; then
+        if [[ "$save_pass_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
             print_message $YELLOW "Enter the database password for user '$DB_USER':" true
             read -s new_db_pass
             echo ""
@@ -96,14 +96,9 @@ setup_backup_schedule() {
     # Construct the command to be run
     local script_path="$SCRIPT_DIR_PATH/ACrebuild.sh"
     local cron_log_path="$SCRIPT_LOG_DIR/$DEFAULT_CRON_LOG_FILENAME"
-    # Prepend the saved PATH to the command to ensure the cron environment is correct.
-    local command_to_run="PATH='$CRON_PATH' bash -l -c \"{ cd '$SCRIPT_DIR_PATH' && '$script_path' --run-backup; } > '$cron_log_path' 2>&1\""
+    local command_to_run="{ cd '$SCRIPT_DIR_PATH' && bash -l -c '$script_path --run-backup'; } > '$cron_log_path' 2>&1"
 
-    # Remove any existing backup job for this script
-    (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
-
-    # Add the new job
-    (crontab -l 2>/dev/null; echo "$cron_schedule $command_to_run # $CRON_COMMENT_TAG") | crontab -
+    (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG"; echo "$cron_schedule $command_to_run # $CRON_COMMENT_TAG") | crontab -
 
     if [ $? -eq 0 ]; then
         print_message $GREEN "Backup schedule successfully created!" true
@@ -143,7 +138,7 @@ disable_automated_backups() {
     print_message $WHITE "  $existing_job" false
     read -p "Are you sure you want to disable automated backups? (y/n): " confirm_disable
 
-    if [[ "$confirm_disable" =~ ^[Yy]$ ]]; then
+    if [[ "$confirm_disable" =~ ^[Yy]([Ee][Ss])?$ ]]; then
         (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
         if [ $? -eq 0 ]; then
             print_message $GREEN "Automated backup schedule successfully disabled." true

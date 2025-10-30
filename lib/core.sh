@@ -156,10 +156,7 @@ handle_error() {
 }
 
 # Function to check if the script is running in a Docker setup
+# This is the single source of truth for Docker mode detection.
 is_docker_setup() {
-    if [ -f "${AZEROTHCORE_DIR}/docker-compose.yml" ]; then
-        return 0 # True, it's a Docker setup
-    else
-        return 1 # False, not a Docker setup
-    fi
+    [ "$USE_DOCKER" = true ]
 }

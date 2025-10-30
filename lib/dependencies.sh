@@ -2,27 +2,26 @@
 
 # Function to check if essential dependencies are installed
 check_dependencies() {
-    echo""
+    echo ""
     print_message $BLUE "Checking for essential dependencies..." true
 
-    while true; do
-        MISSING_DEPENDENCIES=() # Initialize or clear the array for each check
+    local dependencies_met=false
+    while ! $dependencies_met; do
+        MISSING_DEPENDENCIES=()
 
         if is_docker_setup; then
-            # In Docker mode, we only need git and docker
             local DEPENDENCIES=("git" "docker")
             print_message $CYAN "Docker mode: checking for git and docker..." false
             for DEP in "${DEPENDENCIES[@]}"; do
                 if ! command -v "$DEP" &>/dev/null; then
                     MISSING_DEPENDENCIES+=("$DEP")
-                else
-                    if [ "$DEP" == "docker" ]; then
-                        DOCKER_EXEC_PATH=$(command -v docker)
-                    fi
                 fi
             done
+            # Ensure we have the full path to docker exec
+            if [ -z "$DOCKER_EXEC_PATH" ] && command -v docker &>/dev/null; then
+                DOCKER_EXEC_PATH=$(command -v docker)
+            fi
         else
-            # In standard mode, check for build tools and server management tools
             local DEPENDENCIES=("git" "cmake" "make" "clang" "clang++" "tmux" "nc")
             print_message $CYAN "Standard mode: checking for build and server tools..." false
             for DEP in "${DEPENDENCIES[@]}"; do
@@ -32,28 +31,23 @@ check_dependencies() {
             done
         fi
 
-        # Evaluate if dependencies are met
         if [ ${#MISSING_DEPENDENCIES[@]} -eq 0 ]; then
             print_message $GREEN "All required dependencies are installed.\n" true
-            break # Exit the loop, success
+            dependencies_met=true
         else
-            # Announce missing dependencies
             print_message $YELLOW "The following dependencies are required but missing: ${MISSING_DEPENDENCIES[*]}" true
             print_message $YELLOW "Would you like to try and install them now? (y/n)" true
             read -r answer
-            if [[ "$answer" =~ ^[Yy]$ ]]; then
-                install_dependencies # This function uses the global MISSING_DEPENDENCIES array and exits on failure
-                print_message $BLUE "Re-checking dependencies after installation attempt..." true
-                # The loop will now repeat and re-check
+            if [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+                install_dependencies
             else
-                print_message $RED "--------------------------------------------------------------------" true
                 print_message $RED "Critical: Cannot proceed without the required dependencies. Exiting..." true
-                print_message $RED "--------------------------------------------------------------------" true
                 exit 1
             fi
         fi
     done
 }
+
 
 # Function to install the missing dependencies
 install_dependencies() {
@@ -65,7 +59,6 @@ install_dependencies() {
         "apt")
             print_message $CYAN "Using 'apt' package manager." false
             sudo apt update
-            # Map generic dependency names to specific package names for apt
             declare -A dep_map
             dep_map["git"]="git"
             dep_map["cmake"]="cmake"
@@ -74,7 +67,7 @@ install_dependencies() {
             dep_map["clang++"]="clang"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat-openbsd"
-            dep_map["docker"]="docker.io" # Use docker.io for simplicity
+            dep_map["docker"]="docker.io"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -82,7 +75,6 @@ install_dependencies() {
                     packages_to_install+=("${dep_map[$dep]}")
                 fi
             done
-            # Remove duplicates
             packages_to_install=($(printf "%s\n" "${packages_to_install[@]}" | sort -u))
 
             if [ ${#packages_to_install[@]} -gt 0 ]; then
@@ -91,20 +83,16 @@ install_dependencies() {
             ;;
         "yum")
             print_message $CYAN "Using 'yum' package manager." false
-            # For yum, it's often easier to install groups and then individual packages.
-            # Assuming 'Development Tools' covers git, make, gcc (for clang).
             sudo yum groupinstall -y "Development Tools"
-
             declare -A dep_map
             dep_map["cmake"]="cmake"
             dep_map["clang"]="clang"
             dep_map["tmux"]="tmux"
-            dep_map["nc"]="nmap-ncat" # Provides nc
+            dep_map["nc"]="nmap-ncat"
             dep_map["docker"]="docker"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
-                 # git and make are in Dev Tools, so we only need to check for the others
                 if [[ "$dep" != "git" && "$dep" != "make" && "$dep" != "clang++" ]]; then
                     if [ -n "${dep_map[$dep]}" ]; then
                         packages_to_install+=("${dep_map[$dep]}")
@@ -119,10 +107,8 @@ install_dependencies() {
             ;;
         "pacman")
             print_message $CYAN "Using 'pacman' package manager." false
-            # For pacman, 'base-devel' group is key.
             sudo pacman -Syu --noconfirm
             sudo pacman -S --noconfirm --needed base-devel
-
             declare -A dep_map
             dep_map["git"]="git"
             dep_map["cmake"]="cmake"
@@ -148,12 +134,11 @@ install_dependencies() {
         "brew")
             print_message $CYAN "Using 'brew' package manager (for macOS)." false
             brew update
-
             declare -A dep_map
             dep_map["git"]="git"
             dep_map["cmake"]="cmake"
             dep_map["make"]="make"
-            dep_map["clang"]="llvm" # Brew uses llvm for clang
+            dep_map["clang"]="llvm"
             dep_map["clang++"]="llvm"
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat"

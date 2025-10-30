@@ -177,7 +177,7 @@ self_update_script() {
     echo ""
     print_message $YELLOW "Do you want to pull the latest changes? (y/n)" true
     read -r updateConfirm
-    if [[ ! "$updateConfirm" =~ ^[Yy]$ ]]; then
+    if [[ ! "$updateConfirm" =~ ^[Yy]([Ee][Ss])?$ ]]; then
         print_message $GREEN "Self-update cancelled by user." false
         OLDPWD_PREV="${OLDPWD:-$HOME}"
         cd "$OLDPWD_PREV" &>/dev/null
@@ -233,7 +233,7 @@ apply_module_sql() {
 
     if [ ${#sql_files_to_apply[@]} -eq 0 ]; then
         print_message $GREEN "No new SQL files found for module $(basename "$module_dir")." false
-        return
+        return 0
     fi
 
     print_message $YELLOW "The following SQL files were found for module $(basename "$module_dir"):" true
@@ -243,7 +243,7 @@ apply_module_sql() {
 
     print_message $YELLOW "Would you like to apply these SQL files now? (y/n)" true
     read -r apply_sql_choice
-    if [[ "$apply_sql_choice" =~ ^[Yy]$ ]]; then
+    if [[ "$apply_sql_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
         for sql_file in "${sql_files_to_apply[@]}"; do
             local db_name=""
             if [[ "$sql_file" == *"db_world"* ]]; then
@@ -257,20 +257,22 @@ apply_module_sql() {
             if [ -n "$db_name" ]; then
                 print_message $CYAN "Applying $(basename "$sql_file") to database '$db_name'..." false
                 if is_docker_setup; then
-                    cat "$sql_file" | docker compose exec -i -T -e MYSQL_PWD="$DB_PASS" ac-database mysql -u"$DB_USER" "$db_name"
+                    (cd "$AZEROTHCORE_DIR" && cat "$sql_file" | "$DOCKER_EXEC_PATH" compose exec -i -T -e MYSQL_PWD="$DB_PASS" ac-database mysql -u"$DB_USER" "$db_name")
                 else
                     cat "$sql_file" | MYSQL_PWD="$DB_PASS" mysql -u"$DB_USER" "$db_name"
                 fi
                 if [ $? -eq 0 ]; then
                     print_message $GREEN "Successfully applied $(basename "$sql_file")." false
                 else
-                    print_message $RED "Error applying $(basename "$sql_file")." true
+                    print_message $RED "Error applying $(basename "$sql_file"). Aborting further SQL updates for this module." true
+                    return 1
                 fi
             fi
         done
     else
         print_message $CYAN "Skipping SQL import for module $(basename "$module_dir")." false
     fi
+    return 0
 }
 
 # Function to update a specific module by pulling the latest changes
@@ -281,7 +283,7 @@ update_module() {
         print_message $GREEN "Successfully updated module $(basename "$module_dir")." false
         apply_module_sql "$module_dir"
     else
-        print_message $RED "Failed to update module $(basename "$module_dir"). Please check output above for errors (e.g., merge conflicts, detached HEAD, network issues)." true
+        print_message $RED "Failed to update module $(basename "$module_dir"). Please check output above for errors." true
     fi
 }
 
@@ -304,13 +306,11 @@ install_module() {
         return 1
     fi
 
-    # Basic validation for a git URL
     if [[ ! "$git_url" =~ \.git$ ]]; then
         print_message $RED "Invalid Git URL. It should end with '.git'. Aborting." true
         return 1
     fi
 
-    # Extract a module name from the URL to create a directory
     local module_name
     module_name=$(basename "$git_url" .git)
 
@@ -329,7 +329,6 @@ install_module() {
 
     print_message $GREEN "Module '$module_name' installed successfully." true
 
-    # After installing, run the SQL check
     apply_module_sql "$target_dir"
 }
 
@@ -340,7 +339,6 @@ update_modules() {
     if [ ! -d "$module_dir" ]; then
         echo ""
         print_message $RED "Error: The module directory '$module_dir' does not exist." true
-        print_message $RED "Please ensure the path is correct or create the directory if necessary." true
         return
     fi
 
@@ -352,16 +350,15 @@ update_modules() {
     found_git_repo=false
 
     for module in "$module_dir"/*; do
-        if [ -d "$module" ] && [ -d "$module/.git" ]; then
+        if [ -d "$module" ] && git -C "$module" rev-parse --is-inside-work-tree &>/dev/null; then
             found_git_repo=true
             print_message $GREEN "Found Git repository: $(basename "$module")" false
 
-            # Fetch the latest changes from the remote repository
             print_message $CYAN "Fetching updates for $(basename "$module")..." false
             run_command "git fetch origin" "$module"
 
             local=$(run_command "git rev-parse @" "$module")
-            remote=$(run_command "git rev-parse @{u}" "$module") # Check against upstream tracking branch
+            remote=$(run_command "git rev-parse @{u}" "$module")
 
             if [ "$local" != "$remote" ]; then
                 print_message $YELLOW "Update available for $(basename "$module")!" true
@@ -376,7 +373,6 @@ update_modules() {
     if ! $found_git_repo; then
         echo ""
         print_message $YELLOW "No Git repositories found in subdirectories of '$module_dir'." true
-        print_message $BLUE "Module updates are skipped if no .git directories are present in module subfolders." true
         return
     fi
 
@@ -388,105 +384,72 @@ update_modules() {
 
     while true; do
         echo ""
-        print_message $BLUE "============ MODULE UPDATE OPTIONS ============" true # Changed heading
+        print_message $BLUE "============ MODULE UPDATE OPTIONS ============" true
         echo ""
         if [ ${#modules_with_updates[@]} -gt 0 ]; then
             print_message $YELLOW "The following modules have updates available:" true
             for module_path_item in "${modules_with_updates[@]}"; do
-                # Using a bullet point for each module
                 print_message $YELLOW "  • $(basename "$module_path_item")" false
             done
         fi
         echo ""
-        print_message $CYAN "Select an action:" true # Changed to CYAN for sub-heading
+        print_message $CYAN "Select an action:" true
         echo ""
-        print_message $YELLOW "  [1] Update All Modules           (Shortcut: A)" false
-        print_message $YELLOW "  [2] Update Specific Modules      (Shortcut: S)" false
-        print_message $YELLOW "  [3] Quit Module Update           (Shortcut: Q)" false
+        print_message $YELLOW "  [1] Update All Modules" false
+        print_message $YELLOW "  [2] Update Specific Modules" false
+        print_message $YELLOW "  [3] Quit Module Update" false
         echo ""
-        print_message $BLUE "-----------------------------------------------" true # Added footer
-        # Separate the prompt color from user input
-        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice ([A]ll, [S]pecific, [Q]uit, or 1-3): ${NC}")" choice
+        print_message $BLUE "-----------------------------------------------" true
+        read -p "$(echo -e "${YELLOW}${BOLD}Enter choice [1-3]: ${NC}")" choice
         echo ""
 
-        if [[ "$choice" == "3" || "$choice" =~ ^[Qq]$ ]]; then
-            print_message $GREEN "Exiting module update. Returning to main menu..." true
+        if [[ "$choice" == "3" ]]; then
             return
-        elif [[ "$choice" == "1" || "$choice" =~ ^[Aa]$ ]]; then
-            print_message $YELLOW "Are you sure you want to update all listed modules? (y/n)" true
-            read confirm
-            if [[ "${confirm,,}" == "y" ]]; then
-                for module_to_update in "${modules_with_updates[@]}"; do
-                    update_module "$module_to_update"
-                done
+        elif [[ "$choice" == "1" ]]; then
+            for module_to_update in "${modules_with_updates[@]}"; do
+                update_module "$module_to_update"
+            done
+            return
+        elif [[ "$choice" == "2" ]]; then
+            while true; do
                 echo ""
-                print_message $GREEN "All selected modules have been updated successfully." true
-                return
-            else
-                print_message $RED "Update canceled." false
-            fi
-        elif [[ "$choice" == "2" || "$choice" =~ ^[Ss]$ ]]; then
-            while true;
-            do
-                echo ""
-                # Changed heading for specific module update
                 print_message $BLUE "-------- SPECIFIC MODULE UPDATE --------" true
                 echo ""
                 if [ ${#modules_with_updates[@]} -eq 0 ]; then
-                    print_message $GREEN "No more modules available to update in this session." true
-                    # Added a footer here as well for consistency before breaking
-                    print_message $BLUE "-----------------------------------------------" true
-                    break # Break from specific module selection, back to A/S/Q
+                    print_message $GREEN "No more modules available to update." true
+                    break
                 fi
                 print_message $YELLOW "Available modules for update:" false
                 for i in "${!modules_with_updates[@]}"; do
-                    # Formatting as "[i+1] module_name"
                     print_message $YELLOW "  [$((i+1))] $(basename "${modules_with_updates[i]}")" false
                 done
                 local back_option_number=$(( ${#modules_with_updates[@]} + 1 ))
                 print_message $YELLOW "  [$back_option_number] Back to previous menu" false
                 echo ""
-                print_message $BLUE "-----------------------------------------------" true # Added footer
-                # Updated prompt to reflect the dynamic back_option_number
+                print_message $BLUE "-----------------------------------------------" true
                 read -p "$(echo -e "${YELLOW}${BOLD}Enter module number to update or $back_option_number to go back: ${NC}")" specific_choice
-                echo ""
 
                 if ! [[ "$specific_choice" =~ ^[0-9]+$ ]]; then
-                    print_message $RED "Invalid input: '$specific_choice' is not a number." true
+                    print_message $RED "Invalid input." true
                     continue
                 fi
 
-                # Using the dynamic back_option_number for comparison
                 if [ "$specific_choice" -eq "$back_option_number" ]; then
-                    break # Break from specific module selection, back to A/S/Q
+                    break
                 fi
 
                 if [ "$specific_choice" -ge 1 ] && [ "$specific_choice" -le "${#modules_with_updates[@]}" ]; then
                     module_index=$((specific_choice-1))
                     module_path_to_update=${modules_with_updates[$module_index]}
-                    print_message $YELLOW "Are you sure you want to update $(basename "$module_path_to_update")? (y/n)" true
-                    read confirm
-                    if [[ "${confirm,,}" == "y" ]]; then
-                        update_module "$module_path_to_update"
-                        # Remove updated module from list
-                        unset 'modules_with_updates[module_index]'
-                        modules_with_updates=("${modules_with_updates[@]}") # Re-index array
-                        print_message $GREEN "$(basename "$module_path_to_update") update process finished." true
-
-                        # Check if all modules have been updated
-                        if [ ${#modules_with_updates[@]} -eq 0 ]; then
-                            print_message $GREEN "All available module updates completed. Returning to main menu..." true
-                            return # Return from update_modules to the main menu loop
-                        fi
-                    else
-                        print_message $RED "Update canceled for $(basename "$module_path_to_update")." false
-                    fi
+                    update_module "$module_path_to_update"
+                    unset 'modules_with_updates[module_index]'
+                    modules_with_updates=("${modules_with_updates[@]}")
                 else
-                    print_message $RED "Invalid module number: $specific_choice. Please choose from the list." true
+                    print_message $RED "Invalid module number." true
                 fi
             done
         else
-            print_message $RED "Invalid choice. Please enter A, S, Q, or 1-3." true
+            print_message $RED "Invalid choice." true
         fi
     done
 }

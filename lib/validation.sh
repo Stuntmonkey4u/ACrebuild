@@ -45,7 +45,7 @@ validate_settings() {
 
         # Try to connect
         if is_docker_setup; then
-            docker compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" -e "QUIT" &>/dev/null
+            (cd "$AZEROTHCORE_DIR" && "$DOCKER_EXEC_PATH" compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" -e "QUIT" &>/dev/null)
         else
             MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" -e "QUIT" &>/dev/null
         fi
@@ -60,7 +60,7 @@ validate_settings() {
 
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping database container that was started for validation..." false
-        docker compose stop ac-database &>/dev/null
+        (cd "$AZEROTHCORE_DIR" && "$DOCKER_EXEC_PATH" compose stop ac-database &>/dev/null)
     fi
 
     # --- Final Summary ---
