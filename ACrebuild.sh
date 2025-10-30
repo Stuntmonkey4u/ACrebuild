@@ -2,6 +2,21 @@
 
 cd "$(dirname "$0")" || exit 1
 
+# Source all the library files in the correct order
+source ./lib/variables.sh
+source ./lib/core.sh
+source ./lib/config.sh
+source ./lib/dependencies.sh
+source ./lib/update.sh
+source ./lib/server.sh
+source ./lib/backup.sh
+source ./lib/database.sh
+source ./lib/logging.sh
+source ./lib/ui.sh
+source ./lib/wizard.sh
+source ./lib/validation.sh
+source ./lib/cron.sh
+
 # This function sources all libraries and runs initial setup checks.
 initialize() {
     source ./lib/variables.sh
