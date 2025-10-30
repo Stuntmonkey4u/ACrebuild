@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")" || exit 1
+
 # Source all the library files in the correct order
 source ./lib/variables.sh
 source ./lib/core.sh
