@@ -9,11 +9,11 @@ list_backups() {
     fi
 
     print_message $CYAN "Available backup files in $BACKUP_DIR:" false
-    i=0 # Ensure i is reset if list_backups is called multiple times in a session
-    BACKUP_FILES=() # Ensure array is reset before populating
+    i=0
+    BACKUP_FILES=()
     for backup_file in "$BACKUP_DIR"/*.tar.gz; do
         print_message $WHITE "  [$((i+1))] $(basename "$backup_file")" false
-        BACKUP_FILES[i]="$backup_file" # Store full path
+        BACKUP_FILES[i]="$backup_file"
         i=$((i+1))
     done
     print_message $CYAN "  [0] Go Back to Backup/Restore Menu" false
@@ -43,7 +43,7 @@ create_backup_dry_run() {
     for DB_NAME in "${DATABASES[@]}"; do
         print_message $CYAN "[DRY RUN] Would back up database: $DB_NAME" false
         if is_docker_setup; then
-            print_message $WHITE "  Command: $DOCKER_EXEC_PATH compose exec ac-database mysqldump -u"$DB_USER" -p"..." "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"" false
+            print_message $WHITE "  Command: $DOCKER_EXEC_PATH compose exec ac-database mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
         else
             print_message $WHITE "  Command: mysqldump -u\"$DB_USER\" -p\"...\" \"$DB_NAME\" > \"$BACKUP_SUBDIR/$DB_NAME.sql\"" false
         fi
@@ -53,7 +53,6 @@ create_backup_dry_run() {
     for CONFIG_FILE in "${SERVER_CONFIG_FILES[@]}"; do
         if [ -f "$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE" ]; then
             print_message $CYAN "[DRY RUN] Would copy configuration file $CONFIG_FILE to $BACKUP_SUBDIR/" false
-            print_message $WHITE "  Command: cp \"$SERVER_CONFIG_DIR_PATH/$CONFIG_FILE\" \"$BACKUP_SUBDIR/\"" false
         else
             print_message $YELLOW "[DRY RUN] Warning: Configuration file $SERVER_CONFIG_DIR_PATH/$CONFIG_FILE not found. Would skip." false
         fi
@@ -89,29 +88,25 @@ create_backup() {
     fi
     local db_check_result=$?
 
-    if [ $db_check_result -eq 1 ]; then # Error or user abort
+    if [ $db_check_result -eq 1 ]; then
         return 1
-    elif [ $db_check_result -eq 2 ]; then # DB was started by the helper
+    elif [ $db_check_result -eq 2 ]; then
         db_started_by_script=true
     fi
 
-    # Subshell to contain the main backup logic and capture its exit code
     (
-        local current_db_user="$DB_USER"
-        if [ -z "$current_db_user" ]; then
+        if [ -z "$DB_USER" ]; then
             if [ "$non_interactive" = true ]; then
                 print_message $RED "DB_USER not set in config. Aborting non-interactive backup." true
                 return 1
             fi
             print_message $YELLOW "Database username is not set. Enter the database username (e.g., acore):" true
             read -r db_user_input
-            if [ -n "$db_user_input" ]; then
-                DB_USER="$db_user_input"
-                # Note: This doesn't offer to save, adjust if needed
-            else
+            if [ -z "$db_user_input" ]; then
                 print_message $RED "Database username cannot be empty for backup. Aborting." true
                 return 1
             fi
+            DB_USER="$db_user_input"
         fi
 
         local effective_db_pass=""
@@ -124,7 +119,6 @@ create_backup() {
             read -s new_db_pass
             echo ""
             effective_db_pass="$new_db_pass"
-            # Offer to save if not already set
             if [ -n "$effective_db_pass" ]; then
                 print_message $YELLOW "Save this database password to configuration? (Not Recommended)" true
                 read -r save_pass_choice
@@ -149,20 +143,17 @@ create_backup() {
         DATABASES=("$AUTH_DB_NAME" "$CHAR_DB_NAME" "$WORLD_DB_NAME")
         for DB_NAME in "${DATABASES[@]}"; do
             print_message $CYAN "Backing up database: $DB_NAME..." false
-            local backup_failed=false
             if is_docker_setup; then
-                "$DOCKER_EXEC_PATH" compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+                (cd "$AZEROTHCORE_DIR" && "$DOCKER_EXEC_PATH" compose exec -T -e MYSQL_PWD="$effective_db_pass" ac-database mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql")
             else
-                MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql" || backup_failed=true
+                MYSQL_PWD="$effective_db_pass" mysqldump -u"$DB_USER" "$DB_NAME" > "$BACKUP_SUBDIR/$DB_NAME.sql"
             fi
-
-            if [ "$backup_failed" = true ]; then
+            if [ $? -ne 0 ]; then
                 print_message $RED "Error backing up database $DB_NAME." true
                 rm -rf "$BACKUP_SUBDIR"
                 return 1
-            else
-                print_message $GREEN "Database $DB_NAME backed up successfully." false
             fi
+            print_message $GREEN "Database $DB_NAME backed up successfully." false
         done
 
         print_message $CYAN "Backing up server configuration files..." false
@@ -177,24 +168,22 @@ create_backup() {
 
         ARCHIVE_NAME="backup_$TIMESTAMP.tar.gz"
         print_message $CYAN "Creating archive $ARCHIVE_NAME..." false
-        if tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" -C "$BACKUP_DIR" "backup_$TIMESTAMP"; then
-            print_message $GREEN "Archive $ARCHIVE_NAME created successfully." false
-        else
+        if ! tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" -C "$BACKUP_DIR" "backup_$TIMESTAMP"; then
             print_message $RED "Error creating archive $ARCHIVE_NAME." true
             rm -rf "$BACKUP_SUBDIR"
             return 1
         fi
+        print_message $GREEN "Archive $ARCHIVE_NAME created successfully." false
 
         rm -rf "$BACKUP_SUBDIR"
         print_message $GREEN "Backup process completed successfully." true
         return 0
     )
-    backup_result=$? # Capture the exit code of the backup logic
+    backup_result=$?
 
-    # Cleanup: Stop the database container if we started it
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the backup..." false
-        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        (cd "$AZEROTHCORE_DIR" && "$DOCKER_EXEC_PATH" compose stop ac-database) || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 
@@ -210,13 +199,12 @@ restore_backup() {
     ensure_db_is_running
     local db_check_result=$?
 
-    if [ $db_check_result -eq 1 ]; then # Error or user abort
+    if [ $db_check_result -eq 1 ]; then
         return 1
-    elif [ $db_check_result -eq 2 ]; then # DB was started by the helper
+    elif [ $db_check_result -eq 2 ]; then
         db_started_by_script=true
     fi
 
-    # Subshell for the main restore logic
     (
         list_backups || return 1
 
@@ -242,11 +230,11 @@ restore_backup() {
         print_message $YELLOW "It is recommended to back up your current databases before restoring." true
         print_message $YELLOW "Would you like to create a backup of your current state now? (y/n)" true
         read -r backup_first_choice
-        if [[ "$backup_first_choice" =~ ^[Yy]$ ]]; then
+        if [[ "$backup_first_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
             print_message $BLUE "--- Starting Pre-Restore Backup ---" true
             create_backup
             if [ $? -ne 0 ]; then
-                print_message $RED "Pre-restore backup failed. Aborting restore process to ensure safety." true
+                print_message $RED "Pre-restore backup failed. Aborting restore process." true
                 return 1
             fi
             print_message $GREEN "--- Pre-Restore Backup Completed ---" true
@@ -258,10 +246,16 @@ restore_backup() {
         print_message $RED "WARNING: This will overwrite your current databases and configuration files." true
         print_message $YELLOW "Are you absolutely sure you want to continue with the restore? (y/n)" true
         read -r confirmation
-        [[ ! "$confirmation" =~ ^[Yy]$ ]] && { print_message $GREEN "Restore aborted by user." true; return 1; }
+        if [[ ! "$confirmation" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+            print_message $GREEN "Restore aborted by user." true
+            return 1
+        fi
 
-        TEMP_RESTORE_DIR="$BACKUP_DIR/restore_temp_$(date +"%Y%m%d_%H%M%S")"
-        mkdir -p "$TEMP_RESTORE_DIR" || { print_message $RED "Failed to create temp directory." true; return 1; }
+        TEMP_RESTORE_DIR=$(mktemp -d "$BACKUP_DIR/restore_temp_XXXXXX")
+        if [ $? -ne 0 ]; then
+            print_message $RED "Failed to create temp directory." true
+            return 1
+        fi
 
         print_message $CYAN "Extracting backup archive..." false
         tar -xzf "$SELECTED_BACKUP_FILE" -C "$TEMP_RESTORE_DIR" || { print_message $RED "Error extracting archive." true; rm -rf "$TEMP_RESTORE_DIR"; return 1; }
@@ -281,19 +275,17 @@ restore_backup() {
                 continue
             fi
             print_message $CYAN "Restoring database: $DB_NAME..." false
-            local restore_failed=false
             if is_docker_setup; then
-                cat "$SQL_FILE" | "$DOCKER_EXEC_PATH" compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+                (cd "$AZEROTHCORE_DIR" && cat "$SQL_FILE" | "$DOCKER_EXEC_PATH" compose exec -i -T -e MYSQL_PWD="$effective_db_pass" ac-database mysql -u"$DB_USER" "$DB_NAME")
             else
-                cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME" || restore_failed=true
+                cat "$SQL_FILE" | MYSQL_PWD="$effective_db_pass" mysql -u"$DB_USER" "$DB_NAME"
             fi
-            if [ "$restore_failed" = true ]; then
+            if [ $? -ne 0 ]; then
                 print_message $RED "Error restoring database $DB_NAME." true
                 rm -rf "$TEMP_RESTORE_DIR"
                 return 1
-            else
-                print_message $GREEN "Database $DB_NAME restored successfully." false
             fi
+            print_message $GREEN "Database $DB_NAME restored successfully." false
         done
 
         print_message $CYAN "Restoring server configuration files..." false
@@ -313,7 +305,7 @@ restore_backup() {
 
     if [ "$db_started_by_script" = true ]; then
         print_message $CYAN "Stopping 'ac-database' container as it was started for the restore..." false
-        "$DOCKER_EXEC_PATH" compose stop ac-database || print_message $RED "Warning: Failed to stop ac-database container." false
+        (cd "$AZEROTHCORE_DIR" && "$DOCKER_EXEC_PATH" compose stop ac-database) || print_message $RED "Warning: Failed to stop ac-database container." false
         print_message $GREEN "Container 'ac-database' stopped." false
     fi
 

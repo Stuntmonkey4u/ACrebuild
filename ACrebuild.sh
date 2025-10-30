@@ -1,97 +1,79 @@
 #!/bin/bash
 
-# Source all the library files in the correct order
-source ./lib/variables.sh
-source ./lib/core.sh
-source ./lib/config.sh
-source ./lib/dependencies.sh
-source ./lib/update.sh
-source ./lib/server.sh
-source ./lib/backup.sh
-source ./lib/database.sh
-source ./lib/logging.sh
-source ./lib/ui.sh
-source ./lib/wizard.sh
-source ./lib/validation.sh
-source ./lib/cron.sh
+cd "$(dirname "$0")" || exit 1
 
-# Main function to start the script
+# This function sources all libraries and runs initial setup checks.
+initialize() {
+    source ./lib/variables.sh
+    source ./lib/core.sh
+    source ./lib/config.sh
+    source ./lib/dependencies.sh
+    source ./lib/update.sh
+    source ./lib/server.sh
+    source ./lib/backup.sh
+    source ./lib/database.sh
+    source ./lib/logging.sh
+    source ./lib/ui.sh
+    source ./lib/wizard.sh
+    source ./lib/validation.sh
+    source ./lib/cron.sh
+
+    load_config
+    check_dependencies
+}
+
+# Main interactive menu function
 main_menu() {
     clear
-
-    # Load configuration first
-    load_config
-
-    # Check the script's own Git status
     check_script_git_status
     check_for_script_updates
-
-    # Check for dependencies
-    check_dependencies
-
-    # Check for potential docker setup and prompt user if needed
     check_and_prompt_for_docker_usage
 
-    # Show the menu in a loop
+    # Main menu loop
     while true; do
         show_menu
         handle_menu_choice
 
-        # Proceed with selected action
-        # Proceed with selected action only if flags are set
         if [ "$BUILD_ONLY" = true ] || [ "$RUN_SERVER" = true ]; then
             local can_proceed_with_build=true
             if [ "$BUILD_ONLY" = true ]; then
-                ask_for_update_confirmation # This function now also calls ask_for_cores
-                local build_prep_status=$?
-                if [ $build_prep_status -ne 0 ]; then
-                    can_proceed_with_build=false # Abort build
-                    # Reset flags as build is aborted
+                ask_for_update_confirmation
+                if [ $? -ne 0 ]; then
+                    can_proceed_with_build=false
                     BUILD_ONLY=false
                     RUN_SERVER=false
                 fi
 
                 if [ "$can_proceed_with_build" = true ]; then
                     build_and_install_with_spinner
+                    # After build, if not running server, do post-build test for non-docker
+                    if [ "$RUN_SERVER" = false ] && ! is_docker_setup; then
+                        run_authserver
+                    fi
                 fi
             fi
 
             if [ "$RUN_SERVER" = true ] && [ "$can_proceed_with_build" = true ]; then
-                # If only running the server, and no build was done, we still need to ensure paths are set.
-                # ask_for_core_installation_path is called at the start, so paths should be known.
-                run_tmux_session # This function now exits the script.
-            elif [ "$BUILD_ONLY" = true ] && [ "$RUN_SERVER" = false ]; then
-                # This case is for "Rebuild Only" - run temporary authserver
-                if ! is_docker_setup; then
-                    run_authserver # This function no longer exits, returns to main_menu loop.
-                fi
+                run_tmux_session # This function now exits the script
             fi
-        # This case handles when only module update was chosen and completed.
-        # Or if an invalid main menu choice was entered and returned.
-        # No specific message needed here as update_modules gives feedback.
         fi
         
-        # Reset action flags after execution for the next loop iteration
+        # Reset flags for the next loop iteration
         RUN_SERVER=false
         BUILD_ONLY=false
     done
 }
 
+# --- Script Entry Point ---
 
-# Check for command-line flags
-if [ "$1" == "--run-backup" ]; then
-    # Source libraries, load config, and run backup
-    source ./lib/variables.sh
-    source ./lib/core.sh
-    source ./lib/config.sh
-    source ./lib/dependencies.sh
-    source ./lib/database.sh
-    source ./lib/backup.sh
-    load_config
-    check_dependencies
+# Always run initialization first
+initialize
+
+# Check for command-line flags to determine script mode
+if [ "${1-}" == "--run-backup" ]; then
     create_backup --non-interactive
     exit 0
+else
+    # Default to interactive main menu
+    main_menu
 fi
-
-# Run the main menu function when the script starts
-main_menu
