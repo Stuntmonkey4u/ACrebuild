@@ -41,7 +41,7 @@ start_servers() {
             tmux new-session -s "$TMUX_SESSION_NAME" -d
             sleep 1
             tmux select-pane -t "$TMUX_SESSION_NAME:0.0" -T "$AUTHSERVER_PANE_TITLE"
-            tmux send-keys -t "$TMUX_SESSION_NAME:0.0" "cd '$server_bin_dir' && '$auth_exec_path'" C-m
+            tmux send-keys -t "$TMUX_SESSION_NAME:0.0" "cd '$server_bin_dir' && PROMPT_COMMAND='' '$auth_exec_path'" C-m
 
             print_message $CYAN "Waiting for authserver to be ready on port $AUTH_PORT..." false
             local spinner=('\' '|' '/' '-')
@@ -62,7 +62,7 @@ start_servers() {
             tmux split-window -h -t "$TMUX_SESSION_NAME:0.0"
             sleep 1
             tmux select-pane -t "$TMUX_SESSION_NAME:0.1" -T "$WORLDSERVER_PANE_TITLE"
-            tmux send-keys -t "$TMUX_SESSION_NAME:0.1" "cd '$server_bin_dir' && '$world_exec_path'" C-m
+            tmux send-keys -t "$TMUX_SESSION_NAME:0.1" "cd '$server_bin_dir' && PROMPT_COMMAND='' '$world_exec_path'" C-m
 
             print_message $CYAN "Waiting for worldserver to be ready on port $WORLD_PORT..." false
             for i in {1..60}; do
