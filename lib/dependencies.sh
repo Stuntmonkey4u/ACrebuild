@@ -30,10 +30,27 @@ check_dependencies() {
                 fi
             done
 
+            local boost_missing=false
             if command -v dpkg &> /dev/null; then
                 if ! dpkg -s libboost-all-dev &> /dev/null; then
-                    MISSING_DEPENDENCIES+=("libboost-all-dev")
+                    boost_missing=true
                 fi
+            elif command -v rpm &> /dev/null; then
+                if ! rpm -q boost-devel &> /dev/null; then
+                    boost_missing=true
+                fi
+            elif command -v pacman &> /dev/null; then
+                if ! pacman -Q boost &> /dev/null; then
+                    boost_missing=true
+                fi
+            elif command -v brew &> /dev/null; then
+                if ! brew ls --versions boost &> /dev/null; then
+                    boost_missing=true
+                fi
+            fi
+
+            if [ "$boost_missing" = true ]; then
+                MISSING_DEPENDENCIES+=("boost")
             fi
         fi
 
@@ -74,7 +91,7 @@ install_dependencies() {
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat-openbsd"
             dep_map["docker"]="docker.io"
-            dep_map["libboost-all-dev"]="libboost-all-dev"
+            dep_map["boost"]="libboost-all-dev"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -97,6 +114,7 @@ install_dependencies() {
             dep_map["tmux"]="tmux"
             dep_map["nc"]="nmap-ncat"
             dep_map["docker"]="docker"
+            dep_map["boost"]="boost-devel"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -123,6 +141,7 @@ install_dependencies() {
             dep_map["tmux"]="tmux"
             dep_map["nc"]="openbsd-netcat"
             dep_map["docker"]="docker"
+            dep_map["boost"]="boost"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
@@ -150,6 +169,7 @@ install_dependencies() {
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat"
             dep_map["docker"]="docker"
+            dep_map["boost"]="boost"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
