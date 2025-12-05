@@ -337,7 +337,7 @@ run_authserver() {
     "$AUTH_SERVER_EXEC" &
     local auth_server_pid=$!
 
-    print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..."
+    print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..." false
     for i in {1..60}; do
         nc -z localhost "$AUTH_PORT" &>/dev/null && break
         sleep 1
@@ -347,7 +347,7 @@ run_authserver() {
         handle_error "Authserver did not start within the expected time frame."
     fi
 
-    print_message "$GREEN" "Authserver is ready! Waiting 5 seconds before closing..."
+    print_message "$GREEN" "Authserver is ready! Waiting 5 seconds before closing..." false
     sleep 5
 
     kill "$auth_server_pid"
