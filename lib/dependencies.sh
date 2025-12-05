@@ -29,6 +29,12 @@ check_dependencies() {
                     MISSING_DEPENDENCIES+=("$DEP")
                 fi
             done
+
+            if command -v dpkg &> /dev/null; then
+                if ! dpkg -s libboost-all-dev &> /dev/null; then
+                    MISSING_DEPENDENCIES+=("libboost-all-dev")
+                fi
+            fi
         fi
 
         if [ ${#MISSING_DEPENDENCIES[@]} -eq 0 ]; then
@@ -68,6 +74,7 @@ install_dependencies() {
             dep_map["tmux"]="tmux"
             dep_map["nc"]="netcat-openbsd"
             dep_map["docker"]="docker.io"
+            dep_map["libboost-all-dev"]="libboost-all-dev"
 
             local packages_to_install=()
             for dep in "${MISSING_DEPENDENCIES[@]}"; do
