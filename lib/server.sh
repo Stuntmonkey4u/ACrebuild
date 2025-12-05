@@ -352,7 +352,6 @@ run_authserver() {
     local auth_server_pid=$!
 
     print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..." false
-    local server_ready=false
     for i in {1..60}; do
         if nc -z localhost "$AUTH_PORT" &>/dev/null; then
             server_ready=true
