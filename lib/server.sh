@@ -218,23 +218,32 @@ run_tmux_session() {
 ask_for_update_confirmation() {
     print_message $BLUE "--- Build Preparation ---" true
 
-    local auth_port_active=false
-    if nc -z localhost "$AUTH_PORT" &>/dev/null; then auth_port_active=true; fi
-    local world_port_active=false
-    if nc -z localhost "$WORLD_PORT" &>/dev/null; then world_port_active=true; fi
+    local servers_running=false
+    if is_docker_setup; then
+        # For Docker setups, we check if the ac-database container is running.
+        if is_container_running "ac-database"; then
+            servers_running=true
+        fi
+    else
+        # For standard setups, we check for an active TMUX session.
+        if command -v tmux &> /dev/null && tmux has-session -t "$TMUX_SESSION_NAME" 2>/dev/null; then
+            servers_running=true
+        fi
+    fi
 
-    if [ "$auth_port_active" = true ] || [ "$world_port_active" = true ]; then
+    if [ "$servers_running" = true ]; then
         print_message $YELLOW "Servers appear to be running." true
         print_message $YELLOW "It is strongly recommended to stop them before rebuilding." true
         print_message $YELLOW "Would you like to attempt to stop the servers now? (y/n)" true
         read -r stop_choice
         if [[ "$stop_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-            stop_servers
-            if nc -z localhost "$AUTH_PORT" &>/dev/null || nc -z localhost "$WORLD_PORT" &>/dev/null; then
+            if stop_servers; then
+                print_message $GREEN "Servers stopped successfully." true
+            else
+                # stop_servers returns a non-zero exit code if it fails
                 print_message $RED "Failed to stop servers. Rebuild aborted." true
                 return 1
             fi
-            print_message $GREEN "Servers stopped successfully." true
         else
             print_message $RED "User chose not to stop servers. Rebuild aborted." true
             return 1
@@ -337,7 +346,7 @@ run_authserver() {
     "$AUTH_SERVER_EXEC" &
     local auth_server_pid=$!
 
-    print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..." false
+    print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..."
     for i in {1..60}; do
         nc -z localhost "$AUTH_PORT" &>/dev/null && break
         sleep 1
@@ -347,7 +356,7 @@ run_authserver() {
         handle_error "Authserver did not start within the expected time frame."
     fi
 
-    print_message "$GREEN" "Authserver is ready! Waiting 5 seconds before closing..." false
+    print_message "$GREEN" "Authserver is ready! Waiting 5 seconds before closing..."
     sleep 5
 
     kill "$auth_server_pid"
