@@ -339,6 +339,11 @@ build_and_install_with_spinner() {
 
 run_authserver() {
     print_message "$YELLOW" "Starting authserver for a quick test..." true
+
+    # Ensure no old authserver process is running
+    pkill authserver &>/dev/null
+    sleep 2 # Give time for the process to die
+
     if [ ! -f "$AUTH_SERVER_EXEC" ]; then
         handle_error "authserver executable not found at $AUTH_SERVER_EXEC"
     fi
@@ -348,19 +353,30 @@ run_authserver() {
 
     print_message "$GREEN" "Waiting for authserver on port $AUTH_PORT..." false
     for i in {1..60}; do
-        nc -z localhost "$AUTH_PORT" &>/dev/null && break
+        if nc -z localhost "$AUTH_PORT" &>/dev/null; then
+            server_ready=true
+            break
+        fi
         sleep 1
     done
 
-    if ! nc -z localhost "$AUTH_PORT" &>/dev/null; then
+    if [ "$server_ready" = false ]; then
+        # If the server never became ready, the PID might be for a failed process.
+        # Try to kill it, but don't error if it's already gone.
+        if ps -p $auth_server_pid > /dev/null; then
+            kill "$auth_server_pid" &>/dev/null
+        fi
         handle_error "Authserver did not start within the expected time frame."
     fi
 
     print_message "$GREEN" "Authserver is ready! Waiting 5 seconds before closing..." false
     sleep 5
 
-    kill "$auth_server_pid"
-    wait "$auth_server_pid" 2>/dev/null
+    # Only attempt to kill the process if it's still running
+    if ps -p $auth_server_pid > /dev/null; then
+        kill "$auth_server_pid"
+        wait "$auth_server_pid" 2>/dev/null
+    fi
 
     print_message "$GREEN" "Authserver test shutdown complete." true
 }
