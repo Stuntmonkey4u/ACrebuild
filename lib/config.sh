@@ -2,17 +2,17 @@
 
 # Function to load configuration from file or set defaults
 load_config() {
-    print_message $BLUE "Loading configuration..." true
+    print_message "$BLUE" "Loading configuration..." true
 
     # Create config and log directories if they don't exist
-    mkdir -p "$CONFIG_DIR" || { print_message $RED "FATAL: Could not create config directory $CONFIG_DIR. Exiting." true; exit 1; }
-    mkdir -p "$SCRIPT_LOG_DIR" || { print_message $RED "FATAL: Could not create log directory $SCRIPT_LOG_DIR. Exiting." true; exit 1; }
+    mkdir -p "$CONFIG_DIR" || { print_message "$RED" "FATAL: Could not create config directory $CONFIG_DIR. Exiting." true; exit 1; }
+    mkdir -p "$SCRIPT_LOG_DIR" || { print_message "$RED" "FATAL: Could not create log directory $SCRIPT_LOG_DIR. Exiting." true; exit 1; }
 
     if [ ! -f "$CONFIG_FILE" ]; then
         run_setup_wizard
         # After the wizard runs, the config file should exist.
         if [ ! -f "$CONFIG_FILE" ]; then
-            print_message $RED "FATAL: Configuration file not found after setup wizard. Exiting." true
+            print_message "$RED" "FATAL: Configuration file not found after setup wizard. Exiting." true
             exit 1
         fi
     fi
@@ -35,7 +35,7 @@ load_config() {
     else
         DB_USER="${DB_USER:-$DEFAULT_DB_USER}"
     fi
-    DB_PASS="${DB_PASS:-$DEFAULT_DB_PASS}"
+    DB_PASS=$(get_secure_db_pass)
     AUTH_DB_NAME="${AUTH_DB_NAME:-$DEFAULT_AUTH_DB_NAME}"
     CHAR_DB_NAME="${CHAR_DB_NAME:-$DEFAULT_CHAR_DB_NAME}"
     WORLD_DB_NAME="${WORLD_DB_NAME:-$DEFAULT_WORLD_DB_NAME}"
@@ -102,26 +102,41 @@ load_config() {
 
 
     # --- Configuration Migration/Update ---
+    if grep -q "DB_PASS=" "$CONFIG_FILE"; then
+        local old_pass=$(grep "^DB_PASS=" "$CONFIG_FILE" | cut -d'"' -f2 | cut -d"'" -f2)
+        if [ -n "$old_pass" ]; then
+            print_message "$YELLOW" "Migrating plaintext database password from config to secure ~/.my.cnf..." true
+            cat > "$CONFIG_DIR/.my.cnf" <<EOF_CNF
+[client]
+user=${DB_USER}
+password=${old_pass}
+EOF_CNF
+            chmod 600 "$CONFIG_DIR/.my.cnf"
+            sed -i '/DB_PASS=/d' "$CONFIG_FILE"
+            print_message "$GREEN" "Database password securely migrated." true
+        fi
+    fi
+    # --- Configuration Migration/Update ---
     if ! grep -q "CRON_PATH=" "$CONFIG_FILE"; then
-        print_message $YELLOW "CRON_PATH not found in config, adding it now..." true
+        print_message "$YELLOW" "CRON_PATH not found in config, adding it now..." true
         local current_system_path
         current_system_path=$(echo "$PATH")
         save_config_value "CRON_PATH" "$current_system_path"
         CRON_PATH="$current_system_path"
-        print_message $GREEN "CRON_PATH has been saved to your configuration." true
+        print_message "$GREEN" "CRON_PATH has been saved to your configuration." true
     fi
     if ! grep -q "CMAKE_C_COMPILER=" "$CONFIG_FILE"; then
-        print_message $YELLOW "New build settings not found in config, adding them now..." true
+        print_message "$YELLOW" "New build settings not found in config, adding them now..." true
         save_config # This will save all settings, including the new ones, with the new format.
-        print_message $GREEN "New build settings have been added to your configuration." true
+        print_message "$GREEN" "New build settings have been added to your configuration." true
     fi
 
-    print_message $GREEN "Configuration loaded successfully." true
+    print_message "$GREEN" "Configuration loaded successfully." true
 }
 
 # Function to save the current configuration to the config file
 save_config() {
-    print_message $BLUE "Saving configuration..." true
+    print_message "$BLUE" "Saving configuration..." true
     local temp_config_file="$CONFIG_DIR/ACrebuild.conf.tmp"
 
     local current_path
@@ -160,10 +175,6 @@ CORES_FOR_BUILD="$CORES"
 # Defaults to 'acore' for standard, 'root' for Docker.
 DB_USER="$DB_USER"
 
-# The password for the database user.
-# For security, it is recommended to leave this blank. The script will prompt you.
-# For automated backups (cron), this MUST be filled in.
-DB_PASS="$DB_PASS"
 
 # The directory where backups will be stored.
 BACKUP_DIR="$BACKUP_DIR"
@@ -200,15 +211,15 @@ EOF
         mv "$temp_config_file" "$CONFIG_FILE"
         if [ $? -eq 0 ]; then
             chmod 600 "$CONFIG_FILE"
-            print_message $GREEN "Configuration successfully saved to $CONFIG_FILE" true
+            print_message "$GREEN" "Configuration successfully saved to $CONFIG_FILE" true
             return 0
         else
-            print_message $RED "FATAL: Could not move temp config file to $CONFIG_FILE." true
+            print_message "$RED" "FATAL: Could not move temp config file to $CONFIG_FILE." true
             rm -f "$temp_config_file"
             return 1
         fi
     else
-        print_message $RED "FATAL: Could not write to temporary config file $temp_config_file." true
+        print_message "$RED" "FATAL: Could not write to temporary config file $temp_config_file." true
         rm -f "$temp_config_file"
         return 1
     fi
@@ -220,8 +231,8 @@ save_config_value() {
     local temp_config_file="$CONFIG_DIR/ACrebuild.conf.tmp"
 
     if [ ! -f "$CONFIG_FILE" ]; then
-        print_message $YELLOW "Config file not found. A new one will be created." true
-        touch "$CONFIG_FILE" || { print_message $RED "FATAL: Could not create config file $CONFIG_FILE." true; return 1; }
+        print_message "$YELLOW" "Config file not found. A new one will be created." true
+        touch "$CONFIG_FILE" || { print_message "$RED" "FATAL: Could not create config file $CONFIG_FILE." true; return 1; }
         chmod 600 "$CONFIG_FILE"
     fi
 
@@ -236,9 +247,9 @@ save_config_value() {
     fi
 
     if [ $? -eq 0 ]; then
-        print_message $GREEN "Configuration value '$key_to_save' updated." false
+        print_message "$GREEN" "Configuration value '$key_to_save' updated." false
     else
-        print_message $RED "Error updating '$key_to_save' in $CONFIG_FILE." true
+        print_message "$RED" "Error updating '$key_to_save' in $CONFIG_FILE." true
         rm -f "$temp_config_file"
         return 1
     fi
@@ -248,25 +259,25 @@ save_config_value() {
 ask_for_core_installation_path() {
     local current_ac_dir="$AZEROTHCORE_DIR"
     echo ""
-    print_message $YELLOW "AzerothCore Installation Path Setup" true
-    print_message $CYAN "The current AzerothCore directory is set to: $current_ac_dir" false
-    print_message $YELLOW "Press ENTER to keep the current path, or enter a new path:" false
+    print_message "$YELLOW" "AzerothCore Installation Path Setup" true
+    print_message "$CYAN" "The current AzerothCore directory is set to: $current_ac_dir" false
+    print_message "$YELLOW" "Press ENTER to keep the current path, or enter a new path:" false
     read -r user_input_path
 
     if [ -n "$user_input_path" ] && [ "$user_input_path" != "$current_ac_dir" ]; then
-        print_message $YELLOW "You entered a new path: $user_input_path" false
+        print_message "$YELLOW" "You entered a new path: $user_input_path" false
         if [ ! -d "$user_input_path" ]; then
-            print_message $YELLOW "Warning: The specified directory does not currently exist." false
+            print_message "$YELLOW" "Warning: The specified directory does not currently exist." false
         fi
 
-        print_message $YELLOW "Save this new path to the configuration file? (y/n)" true
+        print_message "$YELLOW" "Save this new path to the configuration file? (y/n)" true
         read -r save_choice
         if [[ "$save_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
             save_config_value "AZEROTHCORE_DIR" "$user_input_path"
             # Reload config to update all related paths and variables
             load_config
         else
-            print_message $CYAN "New path will be used for this session only." false
+            print_message "$CYAN" "New path will be used for this session only." false
             AZEROTHCORE_DIR=$(expand_path "$user_input_path")
             # Reload paths dynamically
             BUILD_DIR="$AZEROTHCORE_DIR/build"
@@ -284,6 +295,6 @@ ask_for_core_installation_path() {
         fi
     fi
 
-    print_message $BLUE "Effective paths for this session:" true
-    print_message $GREEN " AzerothCore Directory: $AZEROTHCORE_DIR" false
+    print_message "$BLUE" "Effective paths for this session:" true
+    print_message "$GREEN" " AzerothCore Directory: $AZEROTHCORE_DIR" false
 }

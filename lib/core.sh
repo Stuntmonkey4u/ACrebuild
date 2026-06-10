@@ -50,8 +50,6 @@ run_command() {
         shift 2
     fi
 
-    # Execute the command.
-    # The subshell with 'cd' ensures we don't change the script's main directory.
     if [ -z "$cwd" ]; then
         "$@"
     else
@@ -81,7 +79,7 @@ run_countdown_timer() {
                 return 1 # No
             else
                 # Optional: Handle invalid input during countdown differently, or let it be handled by the caller
-                print_message $RED "\nInvalid input: '$USER_INPUT'. Please enter 'y' or 'n'." false
+                print_message "$RED" "\nInvalid input: '$USER_INPUT'. Please enter 'y' or 'n'." false
                 # For now, let's treat invalid input as 'no' to avoid accidental 'yes' on typo, or simply re-prompt.
                 # Re-prompting by continuing the loop. Let's clear the invalid input message.
                 printf "\r%80s\r" " " # Clear the line
@@ -98,66 +96,20 @@ run_countdown_timer() {
     return 0 # Timeout (default to Yes)
 }
 
-# Global variable to track retry attempts and prevent infinite recursion
-RETRY_IN_PROGRESS=false
 
 # Function to handle errors
 handle_error() {
     local error_message="$1"
     echo "" # Add whitespace before error
-    print_message $RED "--------------------------------------------------------------------" true
-    print_message $RED "ERROR: $error_message" true
+    print_message "$RED" "--------------------------------------------------------------------" true
+    print_message "$RED" "ERROR: $error_message" true
 
-    if [[ "$error_message" == *"CMake configuration failed"* || "$error_message" == *"Build process ('make install') failed"* || "$error_message" == *"Docker build failed"* ]]; then
-        if [ "$RETRY_IN_PROGRESS" = true ]; then
-            print_message $RED "A retry attempt also failed. Please check the logs and your environment." true
-            exit 1
-        fi
-
-        if is_docker_setup; then
-            print_message $YELLOW "A Docker build failure occurred. Would you like to try rebuilding with the '--no-cache' option?" true
-            print_message $YELLOW "This can sometimes resolve issues with corrupted cache layers." true
-        else
-            print_message $YELLOW "A build failure occurred. Would you like to run 'make clean' to try and fix it?" true
-        fi
-
-        run_countdown_timer 900 # 15 minutes
-        local countdown_result=$?
-
-        if [ "$countdown_result" -eq 0 ]; then # User chose 'yes' or timed out
-            RETRY_IN_PROGRESS=true
-            if is_docker_setup; then
-                print_message $GREEN "Attempting to rebuild with '--no-cache'..." true
-                # Pass flag to use no-cache
-                build_and_install_with_spinner --no-cache
-            else
-                print_message $GREEN "Running 'make clean'..." true
-                if [ -d "$BUILD_DIR" ]; then
-                    (cd "$BUILD_DIR" && make clean) || print_message $RED "Warning: 'make clean' encountered an error, but attempting rebuild anyway." false
-                else
-                    print_message $RED "Build directory $BUILD_DIR not found. Cannot run 'make clean'." true
-                fi
-                print_message $BLUE "Attempting to rebuild..." true
-                build_and_install_with_spinner
-            fi
-            print_message $GREEN "Rebuild process finished." true
-            RETRY_IN_PROGRESS=false
-            exit 0
-        elif [ "$countdown_result" -eq 1 ]; then # User chose 'no'
-            print_message $RED "Skipping rebuild attempt. Exiting." true
-            print_message $RED "--------------------------------------------------------------------" true
-            exit 1
-        # Optional: Handle other return codes from run_countdown_timer if you added them (e.g., for invalid input)
-        # else
-        #     print_message $RED "Invalid response from countdown. Exiting." true
-        #     exit 1
-        fi
-    elif [[ "$error_message" == *"authserver executable not found"* ]]; then
-        print_message $RED "Suggestion: Ensure AzerothCore was built successfully and the path is correct." true
+    if [[ "$error_message" == *"authserver executable not found"* ]]; then
+        print_message "$RED" "Suggestion: Ensure AzerothCore was built successfully and the path is correct." true
     elif [[ "$error_message" == *"TMUX session"* ]]; then
-        print_message $RED "Suggestion: Ensure TMUX is installed ('sudo apt install tmux') and functioning correctly." true
+        print_message "$RED" "Suggestion: Ensure TMUX is installed ('sudo apt install tmux') and functioning correctly." true
     fi
-    print_message $RED "--------------------------------------------------------------------" true
+    print_message "$RED" "--------------------------------------------------------------------" true
     exit 1
 }
 
@@ -189,5 +141,14 @@ expand_path() {
         echo "${HOME}${path:1}"
     else
         echo "$path"
+    fi
+}
+
+
+get_secure_db_pass() {
+    if [ -f "$CONFIG_DIR/.my.cnf" ]; then
+        grep '^password=' "$CONFIG_DIR/.my.cnf" | sed 's/^password=//' | tr -d '"' | tr -d "'"
+    else
+        echo ""
     fi
 }

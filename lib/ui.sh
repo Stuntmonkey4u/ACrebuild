@@ -158,7 +158,7 @@ show_config_management_menu() {
             6) break ;;
             *) print_message "$RED" "Invalid choice." false ;;
         esac
-        read -n 1 -s -r -p "Press any key to return to Configuration Management menu..."
+        read -r -n 1 -s -r -p "Press any key to return to Configuration Management menu..."
     done
 }
 
@@ -188,7 +188,7 @@ show_backup_restore_menu() {
             *) print_message "$RED" "Invalid choice." false ;;
         esac
         if [[ "$backup_choice" != "4" && "$backup_choice" != "5" ]]; then
-            read -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
+            read -r -n 1 -s -r -p "Press any key to return to the Backup/Restore menu..."
         fi
     done
 }
@@ -197,14 +197,14 @@ show_backup_restore_menu() {
 show_automated_backup_menu() {
     if ! command -v crontab &>/dev/null; then
         print_message "$RED" "Error: 'crontab' command not found." true
-        read -n 1 -s -r -p "Press any key to return..."
+        read -r -n 1 -s -r -p "Press any key to return..."
         return 1
     fi
 
     check_cron_service
     if [ $? -ne 0 ]; then
         print_message "$RED" "Error: The cron service is not running." true
-        read -n 1 -s -r -p "Press any key to return..."
+        read -r -n 1 -s -r -p "Press any key to return..."
         return 1
     fi
 
@@ -228,7 +228,7 @@ show_automated_backup_menu() {
             *) print_message "$RED" "Invalid choice." false ;;
         esac
         if [[ "$backup_mgmt_choice" != "4" ]]; then
-            read -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
+            read -r -n 1 -s -r -p "Press any key to return to the Automated Backup menu..."
         fi
     done
 }
@@ -288,7 +288,7 @@ show_module_management_menu() {
             *) print_message "$RED" "Invalid choice." false ;;
         esac
         if [[ "$module_choice" != "3" ]]; then
-            read -n 1 -s -r -p "Press any key to return to Module Management menu..."
+            read -r -n 1 -s -r -p "Press any key to return to Module Management menu..."
         fi
     done
 }
@@ -339,7 +339,7 @@ show_process_management_menu() {
             *) print_message "$RED" "Invalid choice." false ;;
         esac
         if [[ "$proc_choice" != "5" ]]; then
-            read -n 1 -s -r -p "Press any key to return to Process Management menu..."
+            read -r -n 1 -s -r -p "Press any key to return to Process Management menu..."
         fi
     done
 }
@@ -376,7 +376,7 @@ handle_menu_choice() {
             ;;
         *)
             print_message "$RED" "Invalid choice." false
-            read -n 1 -s -r -p "Press any key to continue..."
+            read -r -n 1 -s -r -p "Press any key to continue..."
             return
             ;;
     esac

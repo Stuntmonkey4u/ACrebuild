@@ -1,5 +1,16 @@
 #!/bin/bash
 
+prune_old_backups() {
+    if [ -z "$BACKUP_DIR" ] || [ ! -d "$BACKUP_DIR" ]; then
+        return 0
+    fi
+    local retention=${BACKUP_RETENTION_DAYS:-7}
+    if [ "$retention" -gt 0 ]; then
+        print_message "$CYAN" "Pruning backups older than $retention days..." false
+        find "$BACKUP_DIR" -maxdepth 1 -type f -name "backup_*.tar.gz" -mtime +"$retention" -exec rm -f {} \;
+    fi
+}
+
 # A unique identifier for our cron job to find and manage it
 CRON_COMMENT_TAG="ACREBUILD_BACKUP_JOB"
 
@@ -24,54 +35,57 @@ check_cron_service() {
 
 # Function to setup the automated backup schedule
 setup_backup_schedule() {
-    print_message $BLUE "--- Setup Automated Backup Schedule ---" true
+    print_message "$BLUE" "--- Setup Automated Backup Schedule ---" true
 
-    # Check for saved password and prompt if not set
-    if [ -z "$DB_PASS" ]; then
-        print_message $YELLOW "A database password must be saved in the configuration for automated backups." true
-        print_message $RED "${BOLD}Security Warning: Saving your password to the config file is not recommended.${NC}" true
-        print_message $YELLOW "Do you want to enter and save the password now? (y/n)" true
+    # Check for saved password
+    if [ -z "$(get_secure_db_pass)" ]; then
+        print_message "$YELLOW" "A database password must be saved in the configuration for automated backups." true
+        print_message "$YELLOW" "Do you want to enter and save the password now? (y/n)" true
         read -r save_pass_choice
         if [[ "$save_pass_choice" =~ ^[Yy]([Ee][Ss])?$ ]]; then
-            print_message $YELLOW "Enter the database password for user '$DB_USER':" true
-            read -s new_db_pass
+            print_message "$YELLOW" "Enter the database password for user '$DB_USER':" true
+            read -rs new_db_pass
             echo ""
             if [ -z "$new_db_pass" ]; then
-                print_message $RED "Password cannot be empty. Aborting." true
+                print_message "$RED" "Password cannot be empty. Aborting." true
                 return 1
             fi
-            save_config_value "DB_PASS" "$new_db_pass"
-            DB_PASS="$new_db_pass" # Set for current session
+            cat > "$CONFIG_DIR/.my.cnf" <<EOF_CNF
+[client]
+user=${DB_USER}
+password=${new_db_pass}
+EOF_CNF
+            chmod 600 "$CONFIG_DIR/.my.cnf"
         else
-            print_message $GREEN "Operation cancelled. No backup schedule was created." true
+            print_message "$GREEN" "Operation cancelled. No backup schedule was created." true
             return 1
         fi
     fi
 
     # Scheduling wizard
     local schedule_choice
-    print_message $YELLOW "Choose a schedule frequency:" true
-    print_message $CYAN "  [1] Daily" false
-    print_message $CYAN "  [2] Weekly" false
-    read -p "Enter choice [1-2]: " schedule_choice
+    print_message "$YELLOW" "Choose a schedule frequency:" true
+    print_message "$CYAN" "  [1] Daily" false
+    print_message "$CYAN" "  [2] Weekly" false
+    read -r -p "Enter choice [1-2]: " schedule_choice
 
     local cron_schedule=""
     local day_of_week
     local hour
     local minute
 
-    print_message $YELLOW "Enter the time for the backup (24-hour format)." true
-    read -p "Hour (0-23): " hour
-    read -p "Minute (0-59): " minute
+    print_message "$YELLOW" "Enter the time for the backup (24-hour format)." true
+    read -r -p "Hour (0-23): " hour
+    read -r -p "Minute (0-59): " minute
 
     # Basic validation, forcing base-10 interpretation
     if ! [[ "$hour" =~ ^[0-9]+$ ]] || ! ((10#$hour >= 0 && 10#$hour <= 23)); then
-        print_message $RED "Invalid hour format. Must be a number between 0 and 23. Aborting." true
+        print_message "$RED" "Invalid hour format. Must be a number between 0 and 23. Aborting." true
         return 1
     fi
 
     if ! [[ "$minute" =~ ^[0-9]+$ ]] || ! ((10#$minute >= 0 && 10#$minute <= 59)); then
-        print_message $RED "Invalid minute format. Must be a number between 0 and 59. Aborting." true
+        print_message "$RED" "Invalid minute format. Must be a number between 0 and 59. Aborting." true
         return 1
     fi
 
@@ -80,15 +94,15 @@ setup_backup_schedule() {
             cron_schedule="$minute $hour * * *"
             ;;
         2) # Weekly
-            read -p "Day of week (0=Sun, 1=Mon, ..., 6=Sat): " day_of_week
+            read -r -p "Day of week (0=Sun, 1=Mon, ..., 6=Sat): " day_of_week
             if ! [[ "$day_of_week" =~ ^[0-6]$ ]]; then
-                print_message $RED "Invalid day of week. Aborting." true
+                print_message "$RED" "Invalid day of week. Aborting." true
                 return 1
             fi
             cron_schedule="$minute $hour * * $day_of_week"
             ;;
         *)
-            print_message $RED "Invalid choice. Aborting." true
+            print_message "$RED" "Invalid choice. Aborting." true
             return 1
             ;;
     esac
@@ -101,51 +115,52 @@ setup_backup_schedule() {
     (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG"; echo "$cron_schedule $command_to_run # $CRON_COMMENT_TAG") | crontab -
 
     if [ $? -eq 0 ]; then
-        print_message $GREEN "Backup schedule successfully created!" true
+        print_message "$GREEN" "Backup schedule successfully created!" true
     else
-        print_message $RED "Error: Failed to create backup schedule." true
+        print_message "$RED" "Error: Failed to create backup schedule." true
     fi
 }
 
+
 # Function to view the current backup schedule
 view_backup_schedule() {
-    print_message $BLUE "--- Current Automated Backup Schedule ---" true
+    print_message "$BLUE" "--- Current Automated Backup Schedule ---" true
 
     local existing_job
     existing_job=$(crontab -l 2>/dev/null | grep "$CRON_COMMENT_TAG")
 
     if [ -n "$existing_job" ]; then
-        print_message $CYAN "An automated backup job is scheduled:" false
-        print_message $WHITE "  $existing_job" false
+        print_message "$CYAN" "An automated backup job is scheduled:" false
+        print_message "$WHITE" "  $existing_job" false
     else
-        print_message $YELLOW "No automated backup job is currently scheduled." false
+        print_message "$YELLOW" "No automated backup job is currently scheduled." false
     fi
 }
 
 # Function to disable automated backups
 disable_automated_backups() {
-    print_message $BLUE "--- Disable Automated Backups ---" true
+    print_message "$BLUE" "--- Disable Automated Backups ---" true
 
     local existing_job
     existing_job=$(crontab -l 2>/dev/null | grep "$CRON_COMMENT_TAG")
 
     if [ -z "$existing_job" ]; then
-        print_message $YELLOW "No automated backup job is currently scheduled." false
+        print_message "$YELLOW" "No automated backup job is currently scheduled." false
         return
     fi
 
-    print_message $YELLOW "This will remove the following scheduled job:" true
-    print_message $WHITE "  $existing_job" false
-    read -p "Are you sure you want to disable automated backups? (y/n): " confirm_disable
+    print_message "$YELLOW" "This will remove the following scheduled job:" true
+    print_message "$WHITE" "  $existing_job" false
+    read -r -p "Are you sure you want to disable automated backups? (y/n): " confirm_disable
 
     if [[ "$confirm_disable" =~ ^[Yy]([Ee][Ss])?$ ]]; then
         (crontab -l 2>/dev/null | grep -v "$CRON_COMMENT_TAG") | crontab -
         if [ $? -eq 0 ]; then
-            print_message $GREEN "Automated backup schedule successfully disabled." true
+            print_message "$GREEN" "Automated backup schedule successfully disabled." true
         else
-            print_message $RED "Error: Failed to disable automated backups." true
+            print_message "$RED" "Error: Failed to disable automated backups." true
         fi
     else
-        print_message $GREEN "Operation cancelled." false
+        print_message "$GREEN" "Operation cancelled." false
     fi
 }
