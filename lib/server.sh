@@ -355,7 +355,37 @@ ask_for_cores() {
     echo ""
 }
 
+
+patch_apt_sources_to_https() {
+    print_message "$CYAN" "Patching Dockerfiles to use HTTPS for APT repositories to prevent build failures..." false
+
+    if [ -d "$AZEROTHCORE_DIR/apps/docker" ]; then
+        find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g' {} +
+        find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://security.ubuntu.com|https://security.ubuntu.com|g' {} +
+        find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://ports.ubuntu.com|https://ports.ubuntu.com|g' {} +
+
+        # Some dockerfiles use sed to change sources.list inside the RUN block
+        # We can append a sed command to the RUN block that updates apt, or replace it if it's there.
+        # But simply replacing http with https in the Dockerfile text itself covers most direct `RUN sed ...` or ADD commands.
+
+        # For Ubuntu 24.04+, sources are in ubuntu.sources format and use http:// by default.
+        # Let's dynamically add a RUN instruction to swap http for https inside the Dockerfile early on, just in case the base image ships with HTTP.
+        # Actually, if we just modify the Dockerfile to run this sed before apt-get update:
+        # RUN sed -i 's/http:/https:/g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+        # We can inject this right after the FROM or USER root directives.
+
+        # Injecting sed safely:
+        find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" | while read -r df; do
+            if ! grep -q "https:" "$df"; then
+                # Insert the HTTPS sed replacement after the first FROM line
+                awk '/^FROM/ && !inserted {print; print "RUN sed -i \x27s/http:/https:/g\x27 /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true"; inserted=1; next} {print}' "$df" > "$df.tmp" && mv "$df.tmp" "$df"
+            fi
+        done
+    fi
+}
+
 build_and_install_with_spinner() {
+
     local max_retries=1
     local retries=0
     local no_cache=false
@@ -363,12 +393,16 @@ build_and_install_with_spinner() {
         no_cache=true
     fi
 
+
     while [ $retries -le $max_retries ]; do
         echo ""
         print_message "$BLUE" "--- Starting AzerothCore Build and Installation ---" true
         print_message "$YELLOW" "This may take a while..." true
 
+        patch_apt_sources_to_https
+
         local build_success=true
+
 
         if is_docker_setup; then
             print_message "$CYAN" "Running Docker build..." true
