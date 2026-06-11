@@ -360,25 +360,18 @@ patch_apt_sources_to_https() {
     print_message "$CYAN" "Patching Dockerfiles to use HTTPS for APT repositories to prevent build failures..." false
 
     if [ -d "$AZEROTHCORE_DIR/apps/docker" ]; then
+        # Replace hardcoded http strings directly in the Dockerfile text
         find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://archive.ubuntu.com|https://archive.ubuntu.com|g' {} +
         find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://security.ubuntu.com|https://security.ubuntu.com|g' {} +
         find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" -exec sed -i 's|http://ports.ubuntu.com|https://ports.ubuntu.com|g' {} +
 
-        # Some dockerfiles use sed to change sources.list inside the RUN block
-        # We can append a sed command to the RUN block that updates apt, or replace it if it's there.
-        # But simply replacing http with https in the Dockerfile text itself covers most direct `RUN sed ...` or ADD commands.
+        # Inject a RUN command immediately after FROM to catch base image DEB822 and legacy sources
+        # We also need to target ubuntu.sources specifically.
+        local sed_cmd="RUN sed -i 's/http:/https:/g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true"
 
-        # For Ubuntu 24.04+, sources are in ubuntu.sources format and use http:// by default.
-        # Let's dynamically add a RUN instruction to swap http for https inside the Dockerfile early on, just in case the base image ships with HTTP.
-        # Actually, if we just modify the Dockerfile to run this sed before apt-get update:
-        # RUN sed -i 's/http:/https:/g' /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true
-        # We can inject this right after the FROM or USER root directives.
-
-        # Injecting sed safely:
         find "$AZEROTHCORE_DIR/apps/docker" -type f -name "Dockerfile*" | while read -r df; do
-            if ! grep -q "https:" "$df"; then
-                # Insert the HTTPS sed replacement after the first FROM line
-                awk '/^FROM/ && !inserted {print; print "RUN sed -i \x27s/http:/https:/g\x27 /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources 2>/dev/null || true"; inserted=1; next} {print}' "$df" > "$df.tmp" && mv "$df.tmp" "$df"
+            if ! grep -q "ubuntu.sources" "$df"; then
+                awk -v cmd="$sed_cmd" '/^FROM/ && !inserted {print; print cmd; inserted=1; next} {print}' "$df" > "$df.tmp" && mv "$df.tmp" "$df"
             fi
         done
     fi
