@@ -144,7 +144,6 @@ mkdir -p "$BACKUP_DIR" || { print_message "$RED" "Failed to create backup direct
         local avail_space=$(df -k "$BACKUP_DIR" | awk 'NR==2 {print $4}')
         if [ "$avail_space" -lt "$req_space" ]; then
             print_message "$RED" "Insufficient disk space to create backup archive." true
-            rm -rf "$BACKUP_SUBDIR"
             return 1
         fi
         TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -182,7 +181,6 @@ mkdir -p "$BACKUP_DIR" || { print_message "$RED" "Failed to create backup direct
         print_message "$CYAN" "Creating archive $ARCHIVE_NAME..." false
         if ! tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" -C "$BACKUP_DIR" "backup_$TIMESTAMP"; then
             print_message "$RED" "Error creating archive $ARCHIVE_NAME." true
-            rm -rf "$BACKUP_SUBDIR"
             return 1
         fi
         print_message "$GREEN" "Archive $ARCHIVE_NAME created successfully." false

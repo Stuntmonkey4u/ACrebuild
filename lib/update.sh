@@ -111,14 +111,22 @@ update_source_code() {
     export PREVIOUS_COMMIT_HASH=$(git -C "$AZEROTHCORE_DIR" rev-parse HEAD 2>/dev/null)
 
     print_message "$CYAN" "Currently on branch: $current_branch" false
-    print_message "$CYAN" "Pulling latest changes for branch '$current_branch'..." false
+    print_message "$CYAN" "Pulling latest changes for branch '$current_branch' (Force Overwrite)..." false
 
-    if ! git -C "$AZEROTHCORE_DIR" pull origin "$current_branch"; then
-        handle_error "Failed to pull updates from the repository."
+    # Fetch latest remote state
+    if ! git -C "$AZEROTHCORE_DIR" fetch origin; then
+        handle_error "Failed to fetch updates from the repository."
     fi
 
-    print_message "$GREEN" "AzerothCore source code updated successfully.
-" true
+    # Hard reset to origin to overwrite any local modifications
+    if ! git -C "$AZEROTHCORE_DIR" reset --hard "origin/$current_branch"; then
+        handle_error "Failed to hard reset updates from the repository."
+    fi
+
+    # Clean untracked files
+    git -C "$AZEROTHCORE_DIR" clean -fd
+
+    print_message "$GREEN" "AzerothCore source code updated successfully.\n" true
 }
 
 # Function to self-update the script from its Git repository
